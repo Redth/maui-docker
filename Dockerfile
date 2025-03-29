@@ -112,7 +112,7 @@ RUN dotnet android sdk info --home="${ANDROID_HOME}"
 # Provision all of the parts we need
 RUN dotnet build -t:ProvisionJdk ./DockerProvision.csproj -v:detailed
 RUN dotnet build -t:ProvisionAppium ./DockerProvision.csproj -v:detailed
-RUN dotnet build -t:DownloadAndroidSdk ./DockerProvision.csproj -v:detailed
+RUN dotnet build -t:InstallAndroidSdk -p:AndroidSdkHome="${ANDROID_HOME}" ./DockerProvision.csproj -v:detailed
 RUN dotnet build -t:ProvisionAndroidSdk -p:AndroidSdkRequestedApiLevels=${AndroidSdkApiLevel} ./DockerProvision.csproj -v:detailed
 RUN dotnet build -t:ProvisionAndroidSdkAvdCreateAvds -p:AndroidSdkRequestedApiLevels=${AndroidSdkApiLevel} ./DockerProvision.csproj -v:detailed
 
