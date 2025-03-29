@@ -2,29 +2,43 @@
 FROM mcr.microsoft.com/dotnet/sdk:9.0-noble
 
 # Set environment variables
-ENV ANDROID_HOME=/work/.android
+ENV ANDROID_HOME=/home/mauiusr/.android
+
+# Cmdline-tools version
 ENV ANDROID_SDK_VERSION=13.0
-ENV NODE_VERSION=22.x
-ENV ProvisionRequiresSudo="False"
-ENV DEBIAN_FRONTEND=noninteractive
+# API Level for the Android SDK, Emulator, and AVD
 ENV AndroidSdkApiLevel=33
+
+# AVD System Image Type
 ENV AndroidSdkAvdSystemImageType=google_apis_playstore
+
+# Node Version
+ENV NODE_VERSION=22.x
+#ENV ProvisionRequiresSudo="False"
+ENV DEBIAN_FRONTEND=noninteractive
 ENV LOG_PATH=/logs
 ENV ANDROID_TOOL_PROCESS_RUNNER_LOG_PATH=/logs/android-tool-process-runner.log
+ENV ANDROID_SDK_HOME=${ANDROID_HOME}
 
+# Create log directory
 RUN mkdir ${LOG_PATH}
-RUN mkdir /work
 
-# Create a user
+# Install sudo first, installing later fails
+RUN apt-get update && apt-get install -y sudo
+
+# Create mauiusr to run things under
 ARG USER_PASS=secret
 RUN groupadd mauiusr \
          --gid 1401 \
+  && groupadd kvm \
+         --gid 994 \
   && useradd mauiusr \
          --uid 1400 \
          --gid 1401 \
          --create-home \
          --shell /bin/bash \
   && usermod -aG sudo mauiusr \
+  && usermod -aG kvm mauiusr \
   && echo mauiusr:${USER_PASS} | chpasswd \
   && echo 'mauiusr ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 
@@ -50,7 +64,7 @@ RUN apt-get update && apt-get install -y \
     && apt clean all \
     && rm -rf /var/lib/apt/lists/*
 
-# MS OpenJDK
+# Install MS OpenJDK
 RUN ubuntu_release=$(lsb_release -rs) && \
     wget "https://packages.microsoft.com/config/ubuntu/${ubuntu_release}/packages-microsoft-prod.deb" -O packages-microsoft-prod.deb && \
     dpkg -i packages-microsoft-prod.deb && \
@@ -65,67 +79,50 @@ RUN curl -sL https://deb.nodesource.com/setup_${NODE_VERSION} | bash -
 RUN apt-get -qqy install nodejs
 RUN npm install -g npm
 
-# Download SDK, extract it, and move the folder to be latest since we expect $ANDROID_HOME/cmdline-tools/latest folder structure
-# RUN mkdir -p ${ANDROID_HOME}/cmdline-tools/ && cd ${ANDROID_HOME}/cmdline-tools/ && pwd && \
-#     wget -q "https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_SDK_VERSION}_latest.zip" && \
-#     unzip *commandlinetools-linux*.zip && \
-#     rm *commandlinetools*linux*.zip && \
-#     mv cmdline-tools latest && \
-#     ls -al ${ANDROID_HOME}
-
-# Create a directory for supervisor logs
-RUN mkdir -p /var/log/supervisor
-
-# Copy the Supervisor configuration file
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-
-RUN mkdir -p /work
+# Switch to mauiusr
+USER 1400:1401
 
 # Set working directory
-WORKDIR /work
-
-RUN dotnet tool install --tool-path /work/androidsdktool AndroidSdk.Tool
-#RUN export PATH="$PATH:/root/.dotnet/tools"
-
-RUN /work/androidsdktool/android sdk download --home="${ANDROID_HOME}" --version="${ANDROID_SDK_VERSION}"
-RUN rm -rf ${ANDROID_HOME}/androidsdk.zip
-RUN rm -rf ${ANDROID_HOME}/.temp
-
+WORKDIR /home/mauiusr
 
 # Clone the .NET MAUI repository
 RUN git clone https://github.com/dotnet/maui.git
 
 # Set working directory to the MAUI repo
-WORKDIR /work/maui
+WORKDIR /home/mauiusr/maui
 
+# Specific branch with changes needed for provisioning Android SDK and Emulator
 RUN git checkout dev/redth/provision-specific-android-apis
 
 # Copy Android.props file to the container
 COPY DockerProvision.csproj ./DockerProvision.csproj
 
+# Copy the Supervisor configuration file for running the emulator and Appium
+COPY scripts/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY scripts/emulator.sh /home/mauiusr/emulator.sh
+COPY scripts/appium.sh /home/mauiusr/appium.sh
+
+
 # Restore global tools
 RUN dotnet tool restore
 
 # Show SDK Info for logs
-RUN dotnet android sdk info -p:ANDROID_HOME=${ANDROID_HOME}
+RUN dotnet android sdk info --home="${ANDROID_HOME}"
 
+# Provision all of the parts we need
 RUN dotnet build -t:ProvisionJdk ./DockerProvision.csproj -v:detailed
 RUN dotnet build -t:ProvisionAppium ./DockerProvision.csproj -v:detailed
+RUN dotnet build -t:DownloadAndroidSdk ./DockerProvision.csproj -v:detailed
 RUN dotnet build -t:ProvisionAndroidSdk -p:AndroidSdkRequestedApiLevels=${AndroidSdkApiLevel} ./DockerProvision.csproj -v:detailed
+RUN dotnet build -t:ProvisionAndroidSdkAvdCreateAvds -p:AndroidSdkRequestedApiLevels=${AndroidSdkApiLevel} ./DockerProvision.csproj -v:detailed
 
-
-
-WORKDIR /work
+# Clean up the git repo, no longer needed
+WORKDIR /home/mauiusr
 RUN rm -rf maui
 
-# Fix permissions
-#RUN chown -R 1400:1401 /usr/lib/node_modules
-RUN chown -R 1400:1401 /work
+
+# Fix permissions on the log directory
 RUN chown -R 1400:1401 ${LOG_PATH}
-
-# Switch to mauiusr
-USER 1400:1401
-
 
 # Expose ports for Appium, Android emulator, and ADB
 EXPOSE 4723 5554 5555

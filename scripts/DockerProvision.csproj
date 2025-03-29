@@ -10,11 +10,20 @@
     <Target Name="SetAndroidSdkProperties" BeforeTargets="ProvisionAll;ProvisionAndroidSdk;ProvisionAndroidSdkCommonPackages;ProvisionAndroidSdkPlatformApiPackages;ProvisionAndroidSdkEmulatorImagePackages;ProvisionAndroidSdkAvdCreateAvds">
         <PropertyGroup>
             <SkipAppiumDoctor>True</SkipAppiumDoctor>
-            <ProvisionRequiresSudo>False</ProvisionRequiresSudo>
+            <ProvisionRequiresSudo>True</ProvisionRequiresSudo>
         </PropertyGroup>
         <ItemGroup>
             <AndroidSdkApiLevels Remove="@(AndroidSdkApiLevels)" />
             <AndroidSdkApiLevels Include="$(AndroidSdkApiLevel)" SystemImageType="$(AndroidSdkAvdSystemImageType)" DeviceType="$(AndroidSdkAvdDeviceType)" IsDefault="True" />
         </ItemGroup>
     </Target>
+
+    <Target Name="DownloadAndroidSdk" BeforeTargets="ProvisionAndroidSdk" DependsOnTargets="SetAndroidSdkProperties">
+        <Message Text="Downloading Android SDK" />
+
+		<!-- Download SDK Common Packages -->
+		<Exec Command="sdk download --home=&quot;$(ANDROID_HOME)&quot; --version=&quot;$(ANDROID_SDK_VERSION)&quot;" ConsoleToMSBuild="True" />
+
+		<Exec Command="sdk dotnet-prefer --home=&quot;$(ANDROID_HOME)&quot; list --installed" ConsoleToMSBuild="True" IgnoreExitCode="True" />
+	</Target>
 </Project>
