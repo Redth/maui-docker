@@ -5,9 +5,9 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0-noble
 ENV ANDROID_HOME=/home/mauiusr/.android
 
 # Cmdline-tools version
-ENV ANDROID_SDK_VERSION=13.0
+ENV ANDROID_SDK_VERSION=12.0
 # API Level for the Android SDK, Emulator, and AVD
-ENV AndroidSdkApiLevel=33
+ENV AndroidSdkApiLevel=35
 
 # AVD System Image Type
 ENV AndroidSdkAvdSystemImageType=google_apis_playstore
@@ -58,6 +58,7 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     xvfb \
     tzdata \
+    tree \
     qemu-kvm qemu-utils bridge-utils libvirt-daemon-system libvirt-daemon qemu-system virt-manager virtinst libvirt-clients \
     socat supervisor \
     && apt autoremove -y \
@@ -91,17 +92,33 @@ RUN git clone https://github.com/dotnet/maui.git
 # Set working directory to the MAUI repo
 WORKDIR /home/mauiusr/maui
 
-# Specific branch with changes needed for provisioning Android SDK and Emulator
-RUN git checkout dev/redth/provision-specific-android-apis
+#RUN whoami
 
-# Copy Android.props file to the container
-COPY DockerProvision.csproj ./DockerProvision.csproj
+# Specific branch with changes needed for provisioning Android SDK and Emulator
+RUN git fetch && git checkout -b temp 76b6dde86118476f819710f8d6c95ded26fc71c6 
+# dev/redth/provision-specific-android-apis
+
+# Copy csproj file to the container
+COPY scripts/DockerProvision.csproj ./DockerProvision.csproj
 
 # Copy the Supervisor configuration file for running the emulator and Appium
 COPY scripts/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY scripts/emulator.sh /home/mauiusr/emulator.sh
 COPY scripts/appium.sh /home/mauiusr/appium.sh
 
+WORKDIR /home/mauiusr
+
+ENV SDK_VERSION=commandlinetools-linux-13114758_latest
+ENV ANDROID_FOLDER_NAME=cmdline-tools
+ENV ANDROID_DOWNLOAD_PATH=/home/mauiusr/${ANDROID_FOLDER_NAME} \
+    ANDROID_TOOL_HOME=/home/mauiusr/.android/${ANDROID_FOLDER_NAME}
+RUN wget -O tools.zip https://dl.google.com/android/repository/${SDK_VERSION}.zip && \
+    unzip tools.zip && rm tools.zip 
+RUN mkdir -p ${ANDROID_TOOL_HOME} && \
+    mv ${ANDROID_DOWNLOAD_PATH} ${ANDROID_TOOL_HOME}/tools
+ENV PATH=$PATH:${ANDROID_TOOL_HOME}/tools:${ANDROID_TOOL_HOME}/tools/bin
+
+WORKDIR /home/mauiusr/maui
 
 # Restore global tools
 RUN dotnet tool restore
@@ -109,12 +126,24 @@ RUN dotnet tool restore
 # Show SDK Info for logs
 RUN dotnet android sdk info --home="${ANDROID_HOME}"
 
+
 # Provision all of the parts we need
 RUN dotnet build -t:ProvisionJdk ./DockerProvision.csproj -v:detailed
-RUN dotnet build -t:ProvisionAppium ./DockerProvision.csproj -v:detailed
-RUN dotnet build -t:InstallAndroidSdk -p:AndroidSdkHome="${ANDROID_HOME}" ./DockerProvision.csproj -v:detailed
-RUN dotnet build -t:ProvisionAndroidSdk -p:AndroidSdkRequestedApiLevels=${AndroidSdkApiLevel} ./DockerProvision.csproj -v:detailed
+RUN dotnet build -t:ProvisionAppium -p:AppiumNpmInstallLocation=user ./DockerProvision.csproj -v:detailed
+#RUN dotnet build -t:InstallAndroidSdk -p:AndroidSdkHome=${ANDROID_HOME} ./DockerProvision.csproj -v:detailed
+RUN dotnet build -t:ProvisionAndroidSdkCommonPackages -p:AndroidSdkRequestedApiLevels=${AndroidSdkApiLevel} ./DockerProvision.csproj -v:detailed
+RUN dotnet android sdk list --installed --home="${ANDROID_HOME}"
+RUN dotnet build -t:ProvisionAndroidSdkPlatformApiPackages -p:AndroidSdkRequestedApiLevels=${AndroidSdkApiLevel} ./DockerProvision.csproj -v:detailed
+RUN dotnet android sdk list --installed --home="${ANDROID_HOME}"
+RUN dotnet build -t:ProvisionAndroidSdkEmulatorImagePackages -p:AndroidSdkRequestedApiLevels=${AndroidSdkApiLevel} ./DockerProvision.csproj -v:detailed
+RUN dotnet android sdk list --installed --home="${ANDROID_HOME}"
 RUN dotnet build -t:ProvisionAndroidSdkAvdCreateAvds -p:AndroidSdkRequestedApiLevels=${AndroidSdkApiLevel} ./DockerProvision.csproj -v:detailed
+RUN dotnet android sdk list --installed --home="${ANDROID_HOME}"
+#RUN dotnet build -t:ProvisionAndroidSdk -p:AndroidSdkRequestedApiLevels=${AndroidSdkApiLevel} ./DockerProvision.csproj -v:detailed
+
+
+RUN whoami
+RUN tree /home/mauiusr/.android
 
 # Clean up the git repo, no longer needed
 WORKDIR /home/mauiusr
