@@ -4,6 +4,7 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0-noble
 # Set build arguments with default value
 ARG ANDROID_SDK_API_LEVEL=35
 ARG ANDROID_SYSIMG_TYPE=google_apis_playstore
+ARG ANDROID_SDK_HOST_ABI=
 ARG MAUI_REPO_COMMIT=b2b2191462463e5239184b0a47ec0d0fe2d07e7d
 ARG JDK_MAJOR_VERSION=17
 # Node Version
@@ -41,6 +42,7 @@ ENV AndroidSdkAvdSystemImageType=${ANDROID_SYSIMG_TYPE}
 # Use the Appium version from MAUI version properties
 ENV AppiumVersion=${APPIUM_VERSION}
 ENV AppiumUIAutomator2DriverVersion=${APPIUM_UIAUTOMATOR2_VERSION}
+ENV AndroidSdkHostAbi=${ANDROID_SDK_HOST_ABI}
 
 #ENV ProvisionRequiresSudo="False"
 ENV DEBIAN_FRONTEND=noninteractive
@@ -164,10 +166,10 @@ RUN dotnet android sdk info --home="${ANDROID_HOME}"
 
 # Provision the Android SDK and create AVD
 RUN dotnet build -t:InstallAndroidSdk -p:AndroidSdkHome=${ANDROID_HOME} ./DockerProvision.csproj -v:detailed
-RUN dotnet build -t:ProvisionAndroidSdkCommonPackages -p:AndroidSdkRequestedApiLevels=${AndroidSdkApiLevel} ./DockerProvision.csproj -v:detailed
-RUN dotnet build -t:ProvisionAndroidSdkPlatformApiPackages -p:AndroidSdkRequestedApiLevels=${AndroidSdkApiLevel} ./DockerProvision.csproj -v:detailed
-RUN dotnet build -t:ProvisionAndroidSdkEmulatorImagePackages -p:AndroidSdkRequestedApiLevels=${AndroidSdkApiLevel} ./DockerProvision.csproj -v:detailed
-RUN dotnet build -t:ProvisionAndroidSdkAvdCreateAvds -p:AndroidSdkRequestedApiLevels=${AndroidSdkApiLevel} ./DockerProvision.csproj -v:detailed
+RUN dotnet build -t:ProvisionAndroidSdkCommonPackages -p:AndroidSdkRequestedApiLevels=${AndroidSdkApiLevel} -p:AndroidSdkHostAbi=${ANDROID_SDK_HOST_ABI} ./DockerProvision.csproj -v:detailed
+RUN dotnet build -t:ProvisionAndroidSdkPlatformApiPackages -p:AndroidSdkRequestedApiLevels=${AndroidSdkApiLevel} -p:AndroidSdkHostAbi=${ANDROID_SDK_HOST_ABI} ./DockerProvision.csproj -v:detailed
+RUN dotnet build -t:ProvisionAndroidSdkEmulatorImagePackages -p:AndroidSdkRequestedApiLevels=${AndroidSdkApiLevel} -p:AndroidSdkHostAbi=${ANDROID_SDK_HOST_ABI} ./DockerProvision.csproj -v:detailed
+RUN dotnet build -t:ProvisionAndroidSdkAvdCreateAvds -p:AndroidSdkRequestedApiLevels=${AndroidSdkApiLevel} -p:AndroidSdkHostAbi=${ANDROID_SDK_HOST_ABI} ./DockerProvision.csproj -v:detailed
 
 # Accept android licenses
 RUN dotnet android accept-licenses --force --home="${ANDROID_HOME}"
