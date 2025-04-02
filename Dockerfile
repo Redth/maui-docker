@@ -5,12 +5,15 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0-noble
 ENV ANDROID_HOME=/home/mauiusr/.android
 
 # Cmdline-tools version
-ENV ANDROID_SDK_VERSION=12.0
+ENV ANDROID_SDK_VERSION=13.0
 # API Level for the Android SDK, Emulator, and AVD
 ENV AndroidSdkApiLevel=35
 
 # AVD System Image Type
 ENV AndroidSdkAvdSystemImageType=google_apis_playstore
+
+ENV AppiumVersion=2.12.2
+ENV AppiumUIAutomator2DriverVersion=3.8.0
 
 # Node Version
 ENV NODE_VERSION=22.x
@@ -80,6 +83,13 @@ RUN curl -sL https://deb.nodesource.com/setup_${NODE_VERSION} | bash -
 RUN apt-get -qqy install nodejs
 RUN npm install -g npm
 
+# Install Appium
+RUN npm install -g appium@${AppiumVersion}
+RUN chown -R 1400:1401 /usr/lib/node_modules/appium
+
+# Fix permissions on the log directory
+RUN chown -R 1400:1401 ${LOG_PATH}
+
 # Switch to mauiusr
 USER 1400:1401
 
@@ -92,10 +102,8 @@ RUN git clone https://github.com/dotnet/maui.git
 # Set working directory to the MAUI repo
 WORKDIR /home/mauiusr/maui
 
-#RUN whoami
-
 # Specific branch with changes needed for provisioning Android SDK and Emulator
-RUN git fetch && git checkout -b temp 76b6dde86118476f819710f8d6c95ded26fc71c6 
+RUN git fetch && git checkout -b temp 93b2484155078acbac8e7325c52ffb0c6ea95568 
 # dev/redth/provision-specific-android-apis
 
 # Copy csproj file to the container
@@ -106,19 +114,8 @@ COPY scripts/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY scripts/emulator.sh /home/mauiusr/emulator.sh
 COPY scripts/appium.sh /home/mauiusr/appium.sh
 
-WORKDIR /home/mauiusr
-
-ENV SDK_VERSION=commandlinetools-linux-13114758_latest
-ENV ANDROID_FOLDER_NAME=cmdline-tools
-ENV ANDROID_DOWNLOAD_PATH=/home/mauiusr/${ANDROID_FOLDER_NAME} \
-    ANDROID_TOOL_HOME=/home/mauiusr/.android/${ANDROID_FOLDER_NAME}
-RUN wget -O tools.zip https://dl.google.com/android/repository/${SDK_VERSION}.zip && \
-    unzip tools.zip && rm tools.zip 
-RUN mkdir -p ${ANDROID_TOOL_HOME} && \
-    mv ${ANDROID_DOWNLOAD_PATH} ${ANDROID_TOOL_HOME}/tools
-ENV PATH=$PATH:${ANDROID_TOOL_HOME}/tools:${ANDROID_TOOL_HOME}/tools/bin
-
-WORKDIR /home/mauiusr/maui
+# Install appium UIautomator2 driver
+RUN appium driver install uiautomator2@${AppiumUIAutomator2DriverVersion}
 
 # Restore global tools
 RUN dotnet tool restore
@@ -129,29 +126,21 @@ RUN dotnet android sdk info --home="${ANDROID_HOME}"
 
 # Provision all of the parts we need
 RUN dotnet build -t:ProvisionJdk ./DockerProvision.csproj -v:detailed
-RUN dotnet build -t:ProvisionAppium -p:AppiumNpmInstallLocation=user ./DockerProvision.csproj -v:detailed
-#RUN dotnet build -t:InstallAndroidSdk -p:AndroidSdkHome=${ANDROID_HOME} ./DockerProvision.csproj -v:detailed
+#RUN dotnet build -t:ProvisionAppium -p:AppiumNpmInstallLocation=user ./DockerProvision.csproj -v:detailed
+RUN dotnet build -t:InstallAndroidSdk -p:AndroidSdkHome=${ANDROID_HOME} ./DockerProvision.csproj -v:detailed
 RUN dotnet build -t:ProvisionAndroidSdkCommonPackages -p:AndroidSdkRequestedApiLevels=${AndroidSdkApiLevel} ./DockerProvision.csproj -v:detailed
-RUN dotnet android sdk list --installed --home="${ANDROID_HOME}"
 RUN dotnet build -t:ProvisionAndroidSdkPlatformApiPackages -p:AndroidSdkRequestedApiLevels=${AndroidSdkApiLevel} ./DockerProvision.csproj -v:detailed
-RUN dotnet android sdk list --installed --home="${ANDROID_HOME}"
 RUN dotnet build -t:ProvisionAndroidSdkEmulatorImagePackages -p:AndroidSdkRequestedApiLevels=${AndroidSdkApiLevel} ./DockerProvision.csproj -v:detailed
-RUN dotnet android sdk list --installed --home="${ANDROID_HOME}"
 RUN dotnet build -t:ProvisionAndroidSdkAvdCreateAvds -p:AndroidSdkRequestedApiLevels=${AndroidSdkApiLevel} ./DockerProvision.csproj -v:detailed
-RUN dotnet android sdk list --installed --home="${ANDROID_HOME}"
-#RUN dotnet build -t:ProvisionAndroidSdk -p:AndroidSdkRequestedApiLevels=${AndroidSdkApiLevel} ./DockerProvision.csproj -v:detailed
 
-
-RUN whoami
-RUN tree /home/mauiusr/.android
+# Move the node_modules directory which would be in the maui repo dir, to the home directory
+#RUN mv ./node_modules ../node_modules
 
 # Clean up the git repo, no longer needed
 WORKDIR /home/mauiusr
 RUN rm -rf maui
 
-
-# Fix permissions on the log directory
-RUN chown -R 1400:1401 ${LOG_PATH}
+RUN dotnet tool install -g AndroidSdk.Tool
 
 # Expose ports for Appium, Android emulator, and ADB
 EXPOSE 4723 5554 5555

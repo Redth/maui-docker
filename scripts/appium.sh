@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-node appium \
+appium \
   --session-override \
   --log-level debug \
   --log-timestamp \
