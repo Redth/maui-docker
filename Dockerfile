@@ -1,64 +1,81 @@
 # Use .NET SDK base image
-FROM mcr.microsoft.com/dotnet/sdk:9.0-noble
+FROM mcr.microsoft.com/dotnet/sdk:9.0-noble AS env-builder
 
 # Set build arguments with default value
 ARG ANDROID_SDK_API_LEVEL=35
-ARG ANDROID_SYSIMG_TYPE=google_apis_playstore
-ARG ANDROID_AVD_DEVICE_TYPE=Nexus 5X
-ARG TARGETARCH=x86_64
+ARG TARGETARCH
+ARG MAUI_REPO_COMMIT=b2b2191462463e5239184b0a47ec0d0fe2d07e7d
+
+# Install required tools for environment setup
+RUN apt-get update && apt-get install -y curl xmlstarlet gettext-base
+
+# Install Android SDK Tool
+RUN dotnet tool install -g AndroidSdk.Tool
+
+# Get MAUI version props
+ENV MAUI_VERSION_PROPS_URL=https://raw.githubusercontent.com/dotnet/maui/${MAUI_REPO_COMMIT}/eng/Versions.props
+RUN curl -o /tmp/mauiversion.props ${MAUI_VERSION_PROPS_URL}
+
+# Generate environment variables
+RUN if [ "$TARGETARCH" = "arm64" ]; then \
+        echo 'export MAUI_AndroidAvdHostAbi="arm64-v8a"' > /tmp/maui_versions_env; \
+    else \
+        echo 'export MAUI_AndroidAvdHostAbi="x86_64"' > /tmp/maui_versions_env; \
+    fi && \
+    echo 'export MAUI_AndroidSdkApiLevel="${ANDROID_SDK_API_LEVEL}"' >> /tmp/maui_versions_env && \
+    xmlstarlet sel -t \
+        -m "//Project/PropertyGroup/*[contains(name(),'Appium')]" -v "concat('export MAUI_', name(), '=\"', ., '\"')" -n \
+        -m "//Project/PropertyGroup/*[contains(name(),'Android')]" -v "concat('export MAUI_', name(), '=\"', ., '\"')" -n \
+        -m "//Project/PropertyGroup/*[contains(name(),'Java')]" -v "concat('export MAUI_', name(), '=\"', ., '\"')" -n \
+        -m "//Project/ItemGroup/AndroidSdkApiLevels[@Include='${ANDROID_SDK_API_LEVEL}']/@SystemImageType" -v "concat('export MAUI_AndroidAvdSystemImageType=\"', ., '\"')" -n \
+        /tmp/mauiversion.props >> /tmp/maui_versions_env
+
+# Process environment file
+RUN envsubst < /tmp/maui_versions_env > /tmp/maui_versions_env.processed && \
+    sed 's/^export /ENV /' /tmp/maui_versions_env.processed > /tmp/env_instructions
+
+# Start the main image
+FROM mcr.microsoft.com/dotnet/sdk:9.0-noble
+
+# Set build arguments
+ARG ANDROID_SDK_API_LEVEL=35
+ARG ANDROID_AVD_DEVICE_TYPE="Nexus 5X"
+ARG TARGETARCH
 ARG MAUI_REPO_COMMIT=b2b2191462463e5239184b0a47ec0d0fe2d07e7d
 ARG JDK_MAJOR_VERSION=17
 
-# Node Version
-ENV NODE_VERSION=22.x
-
-# Set environment variables
-ENV ANDROID_HOME=/home/mauiusr/.android
-ENV ANDROID_SDK_HOME=${ANDROID_HOME}
-ENV MAUI_REPO_COMMIT=${MAUI_REPO_COMMIT}
-ENV MAUI_VERSION_PROPS_URL=https://raw.githubusercontent.com/dotnet/maui/${MAUI_REPO_COMMIT}/eng/Versions.props
-
-# Enable this to help debug output of android dotnet global tool
-#ENV ANDROID_TOOL_PROCESS_RUNNER_LOG_PATH=/logs/android-tool-process-runner.log
-
-# Install sudo first, installing later fails, need curl too
-RUN apt-get update && apt-get install -y sudo curl xmlstarlet
-
-RUN curl -o /tmp/mauiversion.props ${MAUI_VERSION_PROPS_URL}  
-
-# First add the env for ABI based on TARGETARCH
-RUN if [ "$TARGETARCH" = "arm64" ]; then \
-        echo "export MAUI_AndroidAvdHostAbi=arm64-v8a" > /tmp/maui_versions_env.sh ; \
-    else \
-        echo "export MAUI_AndroidAvdHostAbi=x86_64" > /tmp/maui_versions_env.sh ; \
-    fi
-
-# Next add the env vars from the mauiversion.props file for values we're interested in
-RUN echo "export MAUI_AndroidSdkApiLevel=${ANDROID_SDK_API_LEVEL}" >> /tmp/maui_versions_env.sh && \
-    xmlstarlet sel -t -m "//Project/PropertyGroup/*[contains(name(),'Appium')]" -v "concat('export MAUI_', name(), '=\"', ., '\"')" -n /tmp/mauiversion.props >> /tmp/maui_versions_env.sh && \
-    xmlstarlet sel -t -m "//Project/PropertyGroup/*[contains(name(),'Android')]" -v "concat('export MAUI_', name(), '=\"', ., '\"')" -n /tmp/mauiversion.props >> /tmp/maui_versions_env.sh && \
-    xmlstarlet sel -t -m "//Project/PropertyGroup/*[contains(name(),'Java')]" -v "concat('export MAUI_', name(), '=\"', ., '\"')" -n /tmp/mauiversion.props >> /tmp/maui_versions_env.sh && \
-    xmlstarlet sel -t -m "//Project/ItemGroup/AndroidSdkApiLevels[@Include='${ANDROID_SDK_API_LEVEL}']/@SystemImageType" -v "concat('export MAUI_AndroidAvdSystemImageType=\"', ., '\"')" -n /tmp/mauiversion.props >> /tmp/maui_versions_env.sh && \
-    chmod +x /tmp/maui_versions_env.sh
-
-# Source the script during image build (this only sets ENV at build time)
-RUN . /tmp/maui_versions_env.sh && \
-    env | grep MAUI_ >> /tmp/env_exported
-
-# Extract the env vars and use ENV instruction to persist
-RUN set -a && . /tmp/maui_versions_env.sh && set +a && \
-    env | grep MAUI_ >> /tmp/version_env && \
-    while IFS= read -r line; do echo "ENV $line"; done < /tmp/version_env >> /tmp/Dockerfile.env
-
-# Apply ENV instructions to Dockerfile
-#COPY /tmp/Dockerfile.env ./Dockerfiletemp.env
-#RUN cat ./Dockerfiletemp.env >> /Dockerfile
-
-ENV DEBIAN_FRONTEND=noninteractive
-ENV LOG_PATH=/logs
+# Set core environment variables
+ENV NODE_VERSION=22.x \
+    ANDROID_HOME=/home/mauiusr/.android \
+    ANDROID_SDK_HOME=/home/mauiusr/.android \
+    DEBIAN_FRONTEND=noninteractive \
+    LOG_PATH=/logs \
+    JAVA_HOME="/usr/lib/jvm/msopenjdk-${JDK_MAJOR_VERSION}-${TARGETARCH}"
 
 # Create log directory
 RUN mkdir ${LOG_PATH}
+
+# Install base packages
+RUN apt-get update && apt-get install -y \
+    sudo \
+    curl \
+    ca-certificates \
+    gnupg \
+    udev \
+    tzdata \
+    xvfb \
+    git \
+    lsb-release \
+    wget \
+    unzip \
+    cpu-checker \
+    ffmpeg \
+    tree \
+    qemu-kvm qemu-utils bridge-utils libvirt-daemon-system libvirt-daemon qemu-system virt-manager virtinst libvirt-clients \
+    socat supervisor \
+    && apt autoremove -y \
+    && apt clean all \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create mauiusr to run things under
 ARG USER_PASS=secret
@@ -76,27 +93,20 @@ RUN groupadd mauiusr \
   && echo mauiusr:${USER_PASS} | chpasswd \
   && echo 'mauiusr ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 
-# Install git and other necessary dependencies
-RUN apt-get update && apt-get install -y \
-    ca-certificates \
-    gnupg \
-    udev \
-    tzdata \
-    xvfb \
-    git \
-    lsb-release \
-    wget \
-    unzip \
-    cpu-checker \
-    ffmpeg \
-    xvfb \
-    tzdata \
-    tree \
-    qemu-kvm qemu-utils bridge-utils libvirt-daemon-system libvirt-daemon qemu-system virt-manager virtinst libvirt-clients \
-    socat supervisor \
-    && apt autoremove -y \
-    && apt clean all \
-    && rm -rf /var/lib/apt/lists/*
+# Copy .NET tools and environment variables
+RUN mkdir -p /home/mauiusr/.dotnet/tools && \
+    chown -R 1400:1401 /home/mauiusr/.dotnet
+COPY --from=env-builder /root/.dotnet/tools/ /home/mauiusr/.dotnet/tools/
+COPY --from=env-builder /tmp/env_instructions /tmp/
+COPY --from=env-builder /tmp/maui_versions_env.source /tmp/
+
+# Add .NET tools to PATH and fix permissions
+RUN chmod -R +x /home/mauiusr/.dotnet/tools/* && \
+    chown -R 1400:1401 /home/mauiusr/.dotnet
+ENV PATH="/home/mauiusr/.dotnet/tools:${PATH}"
+
+RUN cat /tmp/env_instructions >> /Dockerfile && \
+    set -a && . /tmp/maui_versions_env.source && set +a
 
 # Install MS OpenJDK
 RUN ubuntu_release=$(lsb_release -rs) && \
@@ -106,8 +116,6 @@ RUN ubuntu_release=$(lsb_release -rs) && \
     apt-get update && \
     apt-get install -y msopenjdk-${JDK_MAJOR_VERSION}
 
-ENV JAVA_HOME="/usr/lib/jvm/msopenjdk-${JDK_MAJOR_VERSION}-${TARGETARCH}}"
-
 # Install Node.js and npm
 RUN curl -sL https://deb.nodesource.com/setup_${NODE_VERSION} | bash -
 RUN apt-get -qqy install nodejs
@@ -116,11 +124,6 @@ RUN npm install -g npm
 # Install Appium
 RUN npm install -g appium@${MAUI_AppiumVersion}
 RUN chown -R 1400:1401 /usr/lib/node_modules/appium
-
-# Clean up
-RUN apt autoremove -y \
-    && apt clean all \
-    && rm -rf /var/lib/apt/lists/*
 
 # Fix permissions on the log directory
 RUN chown -R 1400:1401 ${LOG_PATH}
@@ -140,36 +143,29 @@ COPY scripts/androidportforward.sh /home/mauiusr/androidportforward.sh
 # Install appium UIautomator2 driver
 RUN appium driver install uiautomator2@${MAUI_AppiumUIAutomator2DriverVersion}
 
-# Global install the tool for later use since we deleted the maui repo's copy
-RUN dotnet tool install -g AndroidSdk.Tool
-
-RUN /home/mauiusr/.dotnet/tools/android sdk download --home="${ANDROID_HOME}"
-RUN /home/mauiusr/.dotnet/tools/android sdk install --home="${ANDROID_HOME}" \
+# Install and configure Android SDK
+RUN dotnet tool install -g AndroidSdk.Tool && \
+    android sdk download --home="${ANDROID_HOME}" && \
+    android sdk install --home="${ANDROID_HOME}" \
     --package="platform-tools" \
-    --package="build-tools;${MAUI_AndroidSdkBuildToolsVersion}}" \
+    --package="build-tools;${MAUI_AndroidSdkBuildToolsVersion}" \
     --package="cmdline-tools;${MAUI_AndroidSdkCmdLineToolsVersion}" \
     --package="emulator" \
-    --package="platforms;android-${MAUI_AndroidSdkApiLevel}"
-
-# Download/Install the Android SDK
-RUN /home/mauiusr/.dotnet/tools/android sdk install --home="${ANDROID_HOME}" \
+    --package="platforms;android-${MAUI_AndroidSdkApiLevel}" \
     --package="system-images;android-${MAUI_AndroidSdkApiLevel};${MAUI_AndroidAvdSystemImageType};${MAUI_AndroidAvdHostAbi}"
 
 # Accept Android Licenses
-RUN /home/mauiusr/.dotnet/tools/android accept-licenses --force --home="${ANDROID_HOME}"
+RUN android accept-licenses --force --home="${ANDROID_HOME}"
 
-# Log some info
-RUN /home/mauiusr/.dotnet/tools/android sdk info --home="${ANDROID_HOME}"
-RUN /home/mauiusr/.dotnet/tools/android sdk list --installed --home="${ANDROID_HOME}"
-
-RUN /home/mauiusr/.dotnet/tools/android avd create \
+# Create Android Virtual Device
+RUN android avd create \
     --name="Emulator_${MAUI_AndroidSdkApiLevel}" \
     --sdk="system-images;android-${MAUI_AndroidSdkApiLevel};${MAUI_AndroidAvdSystemImageType};${MAUI_AndroidAvdHostAbi}" \
-    --device="${MAUI_AndroidSdkAvdDeviceType}" \
+    --device="${ANDROID_AVD_DEVICE_TYPE}" \
     --force
 
 # Expose ports for Appium, Android emulator, and ADB
 EXPOSE 4723 5554 5555
 
-# Default command (can be overridden)
+# Default command
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
