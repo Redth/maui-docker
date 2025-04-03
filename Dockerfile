@@ -28,14 +28,13 @@ RUN curl -o /tmp/mauiversion.props ${MAUI_VERSION_PROPS_URL}
 
 # First add the env for ABI based on TARGETARCH
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
-        echo "MAUI_AndroidAvdHostAbi=arm64-v8a" > /tmp/maui_versions_env.sh ; \
+        echo "export MAUI_AndroidAvdHostAbi=arm64-v8a" > /tmp/maui_versions_env.sh ; \
     else \
-        echo "MAUI_AndroidAvdHostAbi=x86_64" > /tmp/maui_versions_env.sh ; \
+        echo "export MAUI_AndroidAvdHostAbi=x86_64" > /tmp/maui_versions_env.sh ; \
     fi
 
 # Next add the env vars from the mauiversion.props file for values we're interested in
-RUN echo "MAUI_AndroidSdkApiLevel=${ANDROID_SDK_API_LEVEL}" >> /tmp/maui_versions_env.sh && \
-    echo "MAUI_AndroidAvdHostAbi=${ANDROID_HOST_ABI}" >> /tmp/maui_versions_env.sh && \
+RUN echo "export MAUI_AndroidSdkApiLevel=${ANDROID_SDK_API_LEVEL}" >> /tmp/maui_versions_env.sh && \
     xmlstarlet sel -t -m "//Project/PropertyGroup/*[contains(name(),'Appium')]" -v "concat('export MAUI_', name(), '=\"', ., '\"')" -n /tmp/mauiversion.props >> /tmp/maui_versions_env.sh && \
     xmlstarlet sel -t -m "//Project/PropertyGroup/*[contains(name(),'Android')]" -v "concat('export MAUI_', name(), '=\"', ., '\"')" -n /tmp/mauiversion.props >> /tmp/maui_versions_env.sh && \
     xmlstarlet sel -t -m "//Project/PropertyGroup/*[contains(name(),'Java')]" -v "concat('export MAUI_', name(), '=\"', ., '\"')" -n /tmp/mauiversion.props >> /tmp/maui_versions_env.sh && \
@@ -52,8 +51,8 @@ RUN set -a && . /tmp/maui_versions_env.sh && set +a && \
     while IFS= read -r line; do echo "ENV $line"; done < /tmp/version_env >> /tmp/Dockerfile.env
 
 # Apply ENV instructions to Dockerfile
-#COPY /tmp/Dockerfile.env /tmp/Dockerfile.env
-#RUN cat /tmp/Dockerfile.env >> /Dockerfile
+#COPY /tmp/Dockerfile.env ./Dockerfiletemp.env
+#RUN cat ./Dockerfiletemp.env >> /Dockerfile
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LOG_PATH=/logs
