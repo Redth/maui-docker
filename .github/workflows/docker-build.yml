@@ -1,0 +1,41 @@
+name: Build Docker Image
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        ANDROID_SDK_API_LEVEL: [23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]
+
+    steps:
+    - name: 🛒 Checkout
+      uses: actions/checkout@v3
+
+    - name: 🐋 DockerHub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: 🔢 Set Version
+      run: echo "version=${{ github.run_id }}" >> $GITHUB_ENV
+
+    - name: 🔨 Build Docker Image
+      run: |
+        docker buildx create --use
+        docker buildx \
+          --platform linux/amd64,linux/arm64 \
+          --build-arg ANDROID_SDK_API_LEVEL=${{ matrix.ANDROID_SDK_API_LEVEL }} \
+          -t maui-android-appium:emulator_${{ matrix.ANDROID_SDK_API_LEVEL }}_${{ env.version }} \
+          -t maui-android-appium:emulator_${{ matrix.ANDROID_SDK_API_LEVEL }} .
+
+    - name: 🚢 Push Docker Image
+      run: |
+        docker push maui-android-appium:emulator_${{ matrix.ANDROID_SDK_API_LEVEL }}_${{env.version}}
