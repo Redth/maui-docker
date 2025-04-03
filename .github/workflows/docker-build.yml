@@ -1,4 +1,4 @@
-name: Build Docker Image
+name: 🐋 Build Docker Images
 
 on:
   push:
@@ -8,6 +8,7 @@ on:
 
 jobs:
   build:
+    name: 🐋 Android/Appium/Emulator (API ${{ matrix.ANDROID_SDK_API_LEVEL }})
     runs-on: ubuntu-latest
 
     strategy:
