@@ -4,9 +4,10 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0-noble
 # Set build arguments with default value
 ARG ANDROID_SDK_API_LEVEL=35
 ARG ANDROID_SYSIMG_TYPE=google_apis_playstore
-ARG ANDROID_SDK_HOST_ABI=
 ARG MAUI_REPO_COMMIT=b2b2191462463e5239184b0a47ec0d0fe2d07e7d
 ARG JDK_MAJOR_VERSION=17
+ARG TARGETARCH
+
 # Node Version
 ENV NODE_VERSION=22.x
 
@@ -42,7 +43,16 @@ ENV AndroidSdkAvdSystemImageType=${ANDROID_SYSIMG_TYPE}
 # Use the Appium version from MAUI version properties
 ENV AppiumVersion=${APPIUM_VERSION}
 ENV AppiumUIAutomator2DriverVersion=${APPIUM_UIAUTOMATOR2_VERSION}
-ENV AndroidSdkHostAbi=${ANDROID_SDK_HOST_ABI}
+
+# Set ANDROID_SDK_HOST_ABI based on TARGETARCH
+ARG TARGETARCH
+ENV TARGETARCH=${TARGETARCH}
+ENV ANDROID_SDK_HOST_ABI=$TARGETARCH
+RUN if [ "$TARGETARCH" = "amd64" ]; then \
+      export ANDROID_SDK_HOST_ABI="x86_64"; \
+    elif [ "$TARGETARCH" = "arm64" ]; then \
+      export ANDROID_SDK_HOST_ABI="arm64-v8a"; \
+    fi
 
 #ENV ProvisionRequiresSudo="False"
 ENV DEBIAN_FRONTEND=noninteractive
