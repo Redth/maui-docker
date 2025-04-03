@@ -30,7 +30,7 @@ jobs:
     - name: 🔨 Build Docker Image
       run: |
         docker buildx create --use
-        docker buildx \
+        docker buildx build \
           --platform linux/amd64,linux/arm64 \
           --build-arg ANDROID_SDK_API_LEVEL=${{ matrix.ANDROID_SDK_API_LEVEL }} \
           -t maui-android-appium:emulator_${{ matrix.ANDROID_SDK_API_LEVEL }}_${{ env.version }} \
