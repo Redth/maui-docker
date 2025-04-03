@@ -13,7 +13,8 @@ jobs:
 
     strategy:
       matrix:
-        ANDROID_SDK_API_LEVEL: [23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]
+        ANDROID_SDK_API_LEVEL: [23, 30, 35]
+        #ANDROID_SDK_API_LEVEL: [23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]
 
     steps:
     - name: 🛒 Checkout
