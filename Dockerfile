@@ -156,8 +156,8 @@ RUN android avd create \
     --device="${ANDROID_SDK_AVD_DEVICE_TYPE}" \
     --force
 
-# Expose ports for Appium, Android emulator, and ADB
-EXPOSE 4723 5554 5555
+# Expose ports for Appium, Android emulator, ADB, and GRPC
+EXPOSE 4723 5554 5555 8554
 
 # Default command
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
