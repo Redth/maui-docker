@@ -13,7 +13,7 @@ jobs:
 
     strategy:
       matrix:
-        ANDROID_SDK_API_LEVEL: [23, 30, 35]
+        ANDROID_SDK_API_LEVEL: [ 34 ]
         #ANDROID_SDK_API_LEVEL: [23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]
 
     steps:
@@ -30,13 +30,8 @@ jobs:
       run: echo "version=${{ github.run_id }}" >> $GITHUB_ENV
 
     - name: 🔨 Build Docker Image
-      run: |
-        docker buildx create --use
-        docker buildx build \
-          --platform linux/amd64,linux/arm64 \
-          --build-arg ANDROID_SDK_API_LEVEL=${{ matrix.ANDROID_SDK_API_LEVEL }} \
-          -t maui-android-appium:emulator_${{ matrix.ANDROID_SDK_API_LEVEL }}_${{ env.version }} \
-          -t maui-android-appium:emulator_${{ matrix.ANDROID_SDK_API_LEVEL }} .
+      shell: pwsh
+      run: ./build.ps1 -AndroidSdkApiLevel ${{ matrix.ANDROID_SDK_API_LEVEL }} -Version ${{ env.version }}
 
     - name: 🚢 Push Docker Image
       run: |

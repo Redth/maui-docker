@@ -1,16 +1,15 @@
-# Variables
-$env:MAUI_REPO_COMMIT = 'b2b2191462463e5239184b0a47ec0d0fe2d07e7d'
-$env:MAUI_VERSION_PROPS_URL = "https://raw.githubusercontent.com/dotnet/maui/$env:MAUI_REPO_COMMIT/eng/Versions.props"
+Param([String]$AndroidSdkApiLevel=35,
+      [String]$Version="latest",
+      [String]$MauiVersionPropsCommit="b2b2191462463e5239184b0a47ec0d0fe2d07e7d") 
 
-# Create build directory
-New-Item -Path './build' -ItemType Directory -Force | Out-Null
+# Variables
+$MauiVersionPropsUrl = "https://raw.githubusercontent.com/dotnet/maui/$MauiVersionPropsCommit/eng/Versions.props"
 
 # Download file
-Invoke-WebRequest -Uri $env:MAUI_VERSION_PROPS_URL -OutFile './build/mauiversion.props'
-
+Invoke-WebRequest -Uri $MauiVersionPropsUrl -OutFile './mauiversion.props'
 
 # Parse XML document
-[xml]$xmlDoc = Get-Content -Path './build/mauiversion.props'
+[xml]$xmlDoc = Get-Content -Path './mauiversion.props'
 
 $output = @()
 
@@ -18,15 +17,39 @@ $output = @()
 $nodes = $xmlDoc.SelectNodes("//Project/PropertyGroup/*[contains(name(),'Appium') or contains(name(),'Android') or contains(name(),'Java')]")
 
 foreach ($node in $nodes) {
-    $output += "`$env:MAUI_$($node.Name) = `"$($node.InnerText)`""
+    if ($node.Name.StartsWith("Appium") -or $node.Name.StartsWith("Android") -or $node.Name.StartsWith("Java")) {
+        Set-Item "env:MAUI_$($node.Name)" $node.InnerText
+    }
 }
 
 # Select specific AndroidSdkApiLevels attribute
-$androidSdkNode = $xmlDoc.SelectSingleNode("//Project/ItemGroup/AndroidSdkApiLevels[@Include='${env:ANDROID_SDK_API_LEVEL}']")
+$androidSdkNode = $xmlDoc.SelectSingleNode("//Project/ItemGroup/AndroidSdkApiLevels[@Include='$AndroidSdkApiLevel']")
 
 if ($androidSdkNode -and $androidSdkNode.SystemImageType) {
-    $output += "`$env:MAUI_AndroidAvdSystemImageType = `"$($androidSdkNode.SystemImageType)`""
+    Set-Item "env:MAUI_AndroidAvdSystemImageType" $($androidSdkNode.SystemImageType)
 }
 
-# Write to output file
-$output | Out-File -FilePath './build/maui_versions.env' -Encoding UTF8 -Append
+Remove-Item -Path './mauiversion.props'
+
+# Define all buildx arguments in an array to avoid backtick issues
+$buildxArgs = @(
+    "buildx", "build",
+    "--platform", "linux/amd64", #"--platform", "linux/amd64,linux/arm64",
+    "--build-arg", "ANDROID_SDK_API_LEVEL=$AndroidSdkApiLevel",
+    "--build-arg", "ANDROID_SDK_BUILD_TOOLS_VERSION=$env:MAUI_AndroidSdkBuildToolsVersion",
+    "--build-arg", "ANDROID_SDK_CMDLINE_TOOLS_VERSION=$env:MAUI_AndroidSdkCmdLineToolsVersion",
+    "--build-arg", "ANDROID_SDK_AVD_DEVICE_TYPE=$env:MAUI_AndroidSdkAvdDeviceType",
+    "--build-arg", "ANDROID_SDK_AVD_SYSTEM_IMAGE_TYPE=$env:MAUI_AndroidAvdSystemImageType",
+    "--build-arg", "APPIUM_VERSION=$env:MAUI_AppiumVersion",
+    "--build-arg", "APPIUM_UIAUTOMATOR2_DRIVER_VERSION=$env:MAUI_AppiumUIAutomator2DriverVersion",
+    "--build-arg", "JAVA_JDK_MAJOR_VERSION=$($env:MAUI_JavaJdkVersion.Split('.')[0])",
+    "-t", "maui-android-appium:emulator_${AndroidSdkApiLevel}_${Version}",
+    "-t", "maui-android-appium:emulator_${AndroidSdkApiLevel}",
+    "."
+)
+
+# Execute the docker command with all arguments
+& docker $buildxArgs
+
+# Output information for debugging
+Write-Host "Docker buildx command completed with exit code: $LASTEXITCODE"
