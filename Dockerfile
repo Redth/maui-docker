@@ -1,48 +1,32 @@
 # Use .NET SDK base image
 FROM mcr.microsoft.com/dotnet/sdk:9.0-noble AS env-builder
 
-# Set build arguments with default value
-ARG ANDROID_SDK_API_LEVEL=35
-ARG TARGETARCH
-ARG MAUI_REPO_COMMIT=b2b2191462463e5239184b0a47ec0d0fe2d07e7d
-
-# Install required tools for environment setup
-RUN apt-get update && apt-get install -y curl xmlstarlet gettext-base
-
 # Install Android SDK Tool
 RUN dotnet tool install -g AndroidSdk.Tool
 
-# Get MAUI version props
-ENV MAUI_VERSION_PROPS_URL=https://raw.githubusercontent.com/dotnet/maui/${MAUI_REPO_COMMIT}/eng/Versions.props
-RUN curl -o /tmp/mauiversion.props ${MAUI_VERSION_PROPS_URL}
-
-# Generate environment variables
-RUN if [ "$TARGETARCH" = "arm64" ]; then \
-        echo 'export MAUI_AndroidAvdHostAbi="arm64-v8a"' > /tmp/maui_versions_env; \
-    else \
-        echo 'export MAUI_AndroidAvdHostAbi="x86_64"' > /tmp/maui_versions_env; \
-    fi && \
-    echo 'export MAUI_AndroidSdkApiLevel="${ANDROID_SDK_API_LEVEL}"' >> /tmp/maui_versions_env && \
-    xmlstarlet sel -t \
-        -m "//Project/PropertyGroup/*[contains(name(),'Appium')]" -v "concat('export MAUI_', name(), '=\"', ., '\"')" -n \
-        -m "//Project/PropertyGroup/*[contains(name(),'Android')]" -v "concat('export MAUI_', name(), '=\"', ., '\"')" -n \
-        -m "//Project/PropertyGroup/*[contains(name(),'Java')]" -v "concat('export MAUI_', name(), '=\"', ., '\"')" -n \
-        -m "//Project/ItemGroup/AndroidSdkApiLevels[@Include='${ANDROID_SDK_API_LEVEL}']/@SystemImageType" -v "concat('export MAUI_AndroidAvdSystemImageType=\"', ., '\"')" -n \
-        /tmp/mauiversion.props >> /tmp/maui_versions_env
-
-# Process environment file
-RUN envsubst < /tmp/maui_versions_env > /tmp/maui_versions_env.processed && \
-    sed 's/^export /ENV /' /tmp/maui_versions_env.processed > /tmp/env_instructions
-
 # Start the main image
-FROM mcr.microsoft.com/dotnet/sdk:9.0-noble
+FROM mcr.microsoft.com/dotnet/runtime:9.0-noble
 
 # Set build arguments
-ARG ANDROID_SDK_API_LEVEL=35
-ARG ANDROID_AVD_DEVICE_TYPE="Nexus 5X"
 ARG TARGETARCH
-ARG MAUI_REPO_COMMIT=b2b2191462463e5239184b0a47ec0d0fe2d07e7d
+
 ARG JDK_MAJOR_VERSION=17
+ARG ANDROID_SDK_API_LEVEL=35
+ARG ANDROID_SDK_BUILD_TOOLS_VERSION=33.0.3
+ARG ANDROID_SDK_CMDLINE_TOOLS_VERSION=13.0
+ARG ANDROID_SDK_AVD_DEVICE_TYPE="Nexus 5X"
+ARG ANDROID_SDK_AVD_SYSTEM_IMAGE_TYPE=google_apis
+ARG APPIUM_VERSION=2.0.12
+ARG APPIUM_UIAUTOMATOR2_DRIVER_VERSION=3.0.8
+
+ARG ANDROID_SDK_AVD_HOST_ABI=x86_64
+
+# Generate environment variables
+#RUN if [ "$TARGETARCH" = "arm64" ]; then \
+#        echo 'export ANDROID_SDK_AVD_HOST_ABI="arm64-v8a"' > /etc/environment ; \
+#    else \
+#        echo 'export ANDROID_SDK_AVD_HOST_ABI="x86_64"' > /etc/environment ; \
+#    fi
 
 # Set core environment variables
 ENV NODE_VERSION=22.x \
@@ -81,8 +65,8 @@ RUN apt-get update && apt-get install -y \
 ARG USER_PASS=secret
 RUN groupadd mauiusr \
          --gid 1401 \
-  && groupadd kvm \
-         --gid 994 \
+  #&& groupadd kvm \
+  #       --gid 994 \
   && useradd mauiusr \
          --uid 1400 \
          --gid 1401 \
@@ -97,16 +81,11 @@ RUN groupadd mauiusr \
 RUN mkdir -p /home/mauiusr/.dotnet/tools && \
     chown -R 1400:1401 /home/mauiusr/.dotnet
 COPY --from=env-builder /root/.dotnet/tools/ /home/mauiusr/.dotnet/tools/
-COPY --from=env-builder /tmp/env_instructions /tmp/
-COPY --from=env-builder /tmp/maui_versions_env.source /tmp/
 
 # Add .NET tools to PATH and fix permissions
 RUN chmod -R +x /home/mauiusr/.dotnet/tools/* && \
     chown -R 1400:1401 /home/mauiusr/.dotnet
 ENV PATH="/home/mauiusr/.dotnet/tools:${PATH}"
-
-RUN cat /tmp/env_instructions >> /Dockerfile && \
-    set -a && . /tmp/maui_versions_env.source && set +a
 
 # Install MS OpenJDK
 RUN ubuntu_release=$(lsb_release -rs) && \
@@ -122,7 +101,7 @@ RUN apt-get -qqy install nodejs
 RUN npm install -g npm
 
 # Install Appium
-RUN npm install -g appium@${MAUI_AppiumVersion}
+RUN npm install -g appium@${APPIUM_VERSION}
 RUN chown -R 1400:1401 /usr/lib/node_modules/appium
 
 # Fix permissions on the log directory
@@ -141,27 +120,30 @@ COPY scripts/appium.sh /home/mauiusr/appium.sh
 COPY scripts/androidportforward.sh /home/mauiusr/androidportforward.sh
 
 # Install appium UIautomator2 driver
-RUN appium driver install uiautomator2@${MAUI_AppiumUIAutomator2DriverVersion}
+RUN appium driver install uiautomator2@${APPIUM_UIAUTOMATOR2_DRIVER_VERSION}
 
 # Install and configure Android SDK
-RUN dotnet tool install -g AndroidSdk.Tool && \
-    android sdk download --home="${ANDROID_HOME}" && \
-    android sdk install --home="${ANDROID_HOME}" \
+RUN android sdk download --home="${ANDROID_HOME}"
+
+RUN android sdk install \
     --package="platform-tools" \
-    --package="build-tools;${MAUI_AndroidSdkBuildToolsVersion}" \
-    --package="cmdline-tools;${MAUI_AndroidSdkCmdLineToolsVersion}" \
+    --package="build-tools;${ANDROID_SDK_BUILD_TOOLS_VERSION}" \
+    --package="cmdline-tools;${ANDROID_SDK_CMDLINE_TOOLS_VERSION}" \
     --package="emulator" \
-    --package="platforms;android-${MAUI_AndroidSdkApiLevel}" \
-    --package="system-images;android-${MAUI_AndroidSdkApiLevel};${MAUI_AndroidAvdSystemImageType};${MAUI_AndroidAvdHostAbi}"
+    --package="platforms;android-${ANDROID_SDK_API_LEVEL}" \
+    --package="system-images;android-${ANDROID_SDK_API_LEVEL};${ANDROID_SDK_AVD_SYSTEM_IMAGE_TYPE};${ANDROID_SDK_AVD_HOST_ABI}"
+
+RUN android sdk info --format=json > /home/mauiusr/sdk_info.json
+RUN android sdk list --installed --format=json > /home/mauiusr/sdk_list.json
 
 # Accept Android Licenses
 RUN android accept-licenses --force --home="${ANDROID_HOME}"
 
 # Create Android Virtual Device
 RUN android avd create \
-    --name="Emulator_${MAUI_AndroidSdkApiLevel}" \
-    --sdk="system-images;android-${MAUI_AndroidSdkApiLevel};${MAUI_AndroidAvdSystemImageType};${MAUI_AndroidAvdHostAbi}" \
-    --device="${ANDROID_AVD_DEVICE_TYPE}" \
+    --name="Emulator_${ANDROID_SDK_API_LEVEL}" \
+    --sdk="system-images;android-${ANDROID_SDK_API_LEVEL};${ANDROID_SDK_AVD_SYSTEM_IMAGE_TYPE};${ANDROID_SDK_AVD_HOST_ABI}" \
+    --device="${ANDROID_SDK_AVD_DEVICE_TYPE}" \
     --force
 
 # Expose ports for Appium, Android emulator, and ADB
