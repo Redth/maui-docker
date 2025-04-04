@@ -137,7 +137,7 @@ RUN android sdk info --format=json > /home/mauiusr/sdk_info.json
 RUN android sdk list --installed --format=json > /home/mauiusr/sdk_list.json
 
 # Accept Android Licenses
-RUN android accept-licenses --force --home="${ANDROID_HOME}"
+RUN android sdk accept-licenses --force --home="${ANDROID_HOME}"
 
 # Create Android Virtual Device
 RUN android avd create \
