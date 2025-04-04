@@ -43,10 +43,11 @@ $buildxArgs = @(
     "--build-arg", "APPIUM_VERSION=$env:MAUI_AppiumVersion",
     "--build-arg", "APPIUM_UIAUTOMATOR2_DRIVER_VERSION=$env:MAUI_AppiumUIAutomator2DriverVersion",
     "--build-arg", "JAVA_JDK_MAJOR_VERSION=$($env:MAUI_JavaJdkVersion.Split('.')[0])",
-    "-t", "maui-android-appium:emulator_${AndroidSdkApiLevel}_${Version}",
-    "-t", "maui-android-appium:emulator_${AndroidSdkApiLevel}",
+    "-t", "redth/maui-docker:android_appium_emulator_${AndroidSdkApiLevel}_${Version}",
+    "-t", "redth/maui-docker:android_appium_emulator_${AndroidSdkApiLevel}",
     "."
 )
+docker push redth/maui-docker:tagname
 
 # Execute the docker command with all arguments
 & docker $buildxArgs

@@ -35,4 +35,6 @@ jobs:
 
     - name: 🚢 Push Docker Image
       run: |
-        docker push maui-android-appium:emulator_${{ matrix.ANDROID_SDK_API_LEVEL }}_${{env.version}}
+        docker push redth/maui-docker:android_appium_emulator_${{ matrix.ANDROID_SDK_API_LEVEL }}_${{env.version}}
+        docker push redth/maui-docker:android_appium_emulator_${{ matrix.ANDROID_SDK_API_LEVEL }}
+
