@@ -1,6 +1,7 @@
 Param([String]$AndroidSdkApiLevel=35,
       [String]$Version="latest",
-      [String]$MauiVersionPropsCommit="b2b2191462463e5239184b0a47ec0d0fe2d07e7d") 
+      [String]$MauiVersionPropsCommit="b2b2191462463e5239184b0a47ec0d0fe2d07e7d",
+      [Bool]$Load=$false) 
 
 # Variables
 $MauiVersionPropsUrl = "https://raw.githubusercontent.com/dotnet/maui/$MauiVersionPropsCommit/eng/Versions.props"
@@ -45,6 +46,7 @@ $buildxArgs = @(
     "--build-arg", "JAVA_JDK_MAJOR_VERSION=$($env:MAUI_JavaJdkVersion.Split('.')[0])",
     "-t", "redth/maui-docker:android_appium_emulator_${AndroidSdkApiLevel}_${Version}",
     "-t", "redth/maui-docker:android_appium_emulator_${AndroidSdkApiLevel}",
+    "--load",
     "."
 )
 docker push redth/maui-docker:tagname
