@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/bash
 
 # Get the local IP address
 local_ip=$(hostname -I | awk '{print $1}')

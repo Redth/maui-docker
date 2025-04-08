@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/bash
 
 export ANDROID_TOOL_PROCESS_RUNNER_LOG_PATH=/logs/androidsdktool.log
 
