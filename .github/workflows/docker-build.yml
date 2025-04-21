@@ -14,7 +14,6 @@ jobs:
     strategy:
       matrix:
         ANDROID_SDK_API_LEVEL: [ 23, 24, 25, 26, 28, 29, 30, 31, 32, 33, 34, 35 ]
-        #ANDROID_SDK_API_LEVEL: [23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]
 
     steps:
     - name: 🛒 Checkout
@@ -31,7 +30,7 @@ jobs:
 
     - name: 🔨 Build Docker Image
       shell: pwsh
-      run: ./build.ps1 -AndroidSdkApiLevel ${{ matrix.ANDROID_SDK_API_LEVEL }} -Version ${{ env.version }}
+      run: ./testing/build.ps1 -AndroidSdkApiLevel ${{ matrix.ANDROID_SDK_API_LEVEL }} -Version ${{ env.version }}
 
     - name: 🚢 Push Docker Image
       run: |
