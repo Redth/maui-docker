@@ -22,7 +22,14 @@ ENV GITHUB_ORG=""
 ENV GITHUB_REPO=""
 ENV GITHUB_TOKEN=""
 ENV RUNNER_NAME_PREFIX="maui-runner"
+ENV RANDOM_RUNNER_SUFFIX=""
+ENV RUNNER_GROUP=""
+ENV RUNNER_WORKDIR=""
 ENV LABELS=""
+ENV DISABLE_AUTO_UPDATE=""
+ENV NO_DEFAULT_LABELS=""
+ENV DISABLE_AUTO_UPDATE=""
+ENV INIT_PWSH_SCRIPT="C:/config/init.ps1"
 
 # Set core environment variables
 ENV ANDROID_HOME="C:/androidsdk"
@@ -31,8 +38,6 @@ ENV LOG_PATH="C:\\logs\\"
 
 # Set PowerShell as the default shell
 SHELL ["powershell.exe", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
-
-#RUN "%SystemRoot%\system32\WindowsPowerShell\v1.0\powershell.exe" -Command "echo HIELLLLOIOOO"
 
 # Create log directory
 RUN New-Item -ItemType Directory -Path $env:LOG_PATH -Force
@@ -82,7 +87,6 @@ RUN $zipFile = $PWD.Path + '\\actions-runner-windows.zip' ; \
 
 # Copy the Supervisor configuration file for running the emulator and Appium
 COPY scripts/runner.ps1 C:/actions-runner/runner.ps1
-
 
 # Default command
 CMD ["powershell", "C:\\actions-runner\\runner.ps1"]

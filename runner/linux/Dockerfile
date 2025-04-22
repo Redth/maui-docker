@@ -20,12 +20,19 @@ ENV ANDROID_SDK_CMDLINE_TOOLS_VERSION=${ANDROID_SDK_CMDLINE_TOOLS_VERSION}
 ENV DOTNET_VERSION=${DOTNET_VERSION}
 ENV DOTNET_WORKLOADS_VERSION=${DOTNET_WORKLOADS_VERSION}
 
-
+# Define environment variables for GitHub runner registration
+# Default to empty values, will be overridden by values from docker-compose 
 ENV GITHUB_ORG=""
 ENV GITHUB_REPO=""
 ENV GITHUB_TOKEN=""
 ENV RUNNER_NAME_PREFIX="maui-runner"
+ENV RANDOM_RUNNER_SUFFIX=""
+ENV RUNNER_GROUP=""
+ENV RUNNER_WORKDIR=""
 ENV LABELS=""
+ENV DISABLE_AUTO_UPDATE=""
+ENV NO_DEFAULT_LABELS=""
+ENV DISABLE_AUTO_UPDATE=""
 
 # Set core environment variables
 ENV ANDROID_HOME=/home/mauiusr/.android \
