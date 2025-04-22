@@ -32,7 +32,10 @@ ENV RUNNER_WORKDIR=""
 ENV LABELS=""
 ENV DISABLE_AUTO_UPDATE=""
 ENV NO_DEFAULT_LABELS=""
-ENV DISABLE_AUTO_UPDATE=""
+ENV EPHEMERAL=""
+
+ENV INIT_PWSH_SCRIPT="/config/init.ps1"
+ENV INIT_BASH_SCRIPT="/config/init.sh"
 
 # Set core environment variables
 ENV ANDROID_HOME=/home/mauiusr/.android \

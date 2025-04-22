@@ -30,6 +30,9 @@ ENV APPIUM_VERSION=${APPIUM_VERSION}
 ENV APPIUM_UIAUTOMATOR2_DRIVER_VERSION=${APPIUM_UIAUTOMATOR2_DRIVER_VERSION}
 ENV ANDROID_SDK_AVD_HOST_ABI=${ANDROID_SDK_AVD_HOST_ABI}
 
+ENV INIT_PWSH_SCRIPT="/config/init.ps1"
+ENV INIT_BASH_SCRIPT="/config/init.sh"
+
 # Not needed currently as linux android sdk doesn't support arm64 emulators
 # Generate environment variables
 #RUN if [ "$TARGETARCH" = "arm64" ]; then \
