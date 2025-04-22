@@ -12,7 +12,7 @@ env:
 jobs:
   build-windows:
     name: 🐋 Build Windows Runner (API ${{ matrix.DOTNET_VERSION }})
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
 
     strategy:
       matrix:
