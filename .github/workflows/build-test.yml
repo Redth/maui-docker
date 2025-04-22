@@ -8,6 +8,8 @@ on:
 
 env:
   DOCKER_REPOSITORY: redth/maui-docker
+  ALL_API_LEVELS: '[23, 24, 25, 26, 28, 29, 30, 31, 32, 33, 34, 35]'
+  PR_API_LEVELS: '[35]'
 
 jobs:
   build:
@@ -16,7 +18,7 @@ jobs:
 
     strategy:
       matrix:
-        ANDROID_SDK_API_LEVEL: [ 23, 24, 25, 26, 28, 29, 30, 31, 32, 33, 34, 35 ]
+        ANDROID_SDK_API_LEVEL: ${{ fromJson(github.ref == 'refs/heads/main' && env.ALL_API_LEVELS || env.PR_API_LEVELS) }}
 
     steps:
     - name: 🛒 Checkout
@@ -35,10 +37,7 @@ jobs:
       shell: pwsh
       working-directory: ./test/
       run: |
-        $Push = $false
-        if ("${{ github.ref }}" -eq "refs/heads/main") {
-          $Push = $true
-        }
+        $Push = ${{ github.ref == 'refs/heads/main' }}
         ./build.ps1 `
           -AndroidSdkApiLevel ${{ matrix.ANDROID_SDK_API_LEVEL }} `
           -DockerRepository ${{ env.DOCKER_REPOSITORY }} `
