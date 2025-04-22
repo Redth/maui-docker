@@ -55,8 +55,8 @@ $buildxArgs = @(
     "--build-arg", "APPIUM_VERSION=$env:MAUI_AppiumVersion",
     "--build-arg", "APPIUM_UIAUTOMATOR2_DRIVER_VERSION=$env:MAUI_AppiumUIAutomator2DriverVersion",
     "--build-arg", "JAVA_JDK_MAJOR_VERSION=$($env:MAUI_JavaJdkVersion.Split('.')[0])",
-    "-t", "${DockerRepository}:${dockerImageName}-android${AndroidSdkApiLevel}-v${Version}",
-    "-t", "${DockerRepository}:${dockerImageName}-android${AndroidSdkApiLevel}"
+    "-t", "${DockerRepository}:${dockerTagBase}-android${AndroidSdkApiLevel}-v${Version}",
+    "-t", "${DockerRepository}:${dockerTagBase}-android${AndroidSdkApiLevel}"
 )
 
 if ($Load) {

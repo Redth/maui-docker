@@ -16,7 +16,7 @@ docker run `
     -p 5554:5554 `
     -p 5555:5555 `
     -p 4723:4723 `
-    redth/maui-docker/test-linux:android35
+    redth/maui-testing:appium-emulator-linux-android35
 ```
 
 > NOTE: Ports are mapped for the emulator, ADB, and Appium in this example.
@@ -53,7 +53,7 @@ docker run `
     -e GITHUB_ORG=myorg `
     -e GITHUB_REPO=myrepo `
     -e GITHUB_TOKEN=myaccesstoken `
-    redth/maui-docker/runner-windows:dotnet9.0
+    redth/maui-actions-runner:windows-dotnet9.0
 ```
 
 > NOTE: You can omit the `GITHUB_REPO` to install the runner at the organization level, but make sure you have an access token (PAT) with the correct access at this level to do so.
