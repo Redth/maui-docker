@@ -1,5 +1,5 @@
 # Use .NET SDK base image
-FROM mcr.microsoft.com/dotnet/sdk:9.0-windowsservercore-ltsc2025
+FROM mcr.microsoft.com/dotnet/sdk:9.0-windowsservercore-ltsc2022
 
 # Set build arguments
 ARG GITHUB_ACTIONS_RUNNER_VERSION=2.323.0
