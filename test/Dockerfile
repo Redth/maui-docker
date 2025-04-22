@@ -132,6 +132,7 @@ COPY scripts/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY scripts/emulator.sh /home/mauiusr/emulator.sh
 COPY scripts/appium.sh /home/mauiusr/appium.sh
 COPY scripts/androidportforward.sh /home/mauiusr/androidportforward.sh
+COPY scripts/init.sh /home/mauiusr/init.sh
 
 # Install appium UIautomator2 driver
 RUN appium driver install uiautomator2@${APPIUM_UIAUTOMATOR2_DRIVER_VERSION}

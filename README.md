@@ -23,9 +23,14 @@ docker run `
 
 > NOTE: Ports are mapped for the emulator, ADB, and Appium in this example.
 
-> NOTE: The host folder with the built apk's can be mapped to a folder in the container.  You can then specify the location of the apk to install to appium using the container's path to it (eg: `/app/my.companyname.app-Signed.apk`).
-
 > NOTE: Device passthrough of `/dev/kvm` is required for the emulator
+
+### Volumes:
+The host folder with the built apk's can be mapped to a folder in the container.  You can then specify the location of the apk to install to appium using the container's path to it (eg: `/app/my.companyname.app-Signed.apk`).
+
+### Environment Variables:
+- `INIT_PWSH_SCRIPT` Optionally (linux or windows images) specify a path to a .ps1 script file to run before starting the runner agent (Default path is `/config/init.ps1` on linux and `C:\\config\\init.ps1` on windows - you would need to bind a volume for the script to use)
+- `INIT_BASH_SCRIPT` Optionally (linux image only) specify a path to a .ps1 script file to run before starting the runner agent (Default path is `/config/init.sh` on linux - you would need to bind a volume for the script to use)
 
 ### Variants
 
@@ -91,11 +96,13 @@ docker run `
 - `GITHUB_ORG` Required github organization to attach the runner to.
 - `GITHUB_REPO` Optional repository name to attach the runner to (otherwise attaches at the org level).
 - `RUNNER_NAME` Optionally sets an explicit runner name.  Default is calculated based on a suffix, and random suffix.
+- `RUNNER_NAME_PREFIX` Optional prefix to be used for the runner name.
 - `RANDOM_RUNNER_SUFFIX` Default is `true`.  If true, adds a random suffix to the RUNNER_NAME.
 - `LABELS` Overrides the default set of labels to apply to the runner.
 - `RUNNER_GROUP` Overrides the default runner group.
 - `RUNNER_WORKDIR` Overrides the default runner work directory.
-
+- `INIT_PWSH_SCRIPT` Optionally (linux or windows images) specify a path to a .ps1 script file to run before starting the runner agent (Default path is `/config/init.ps1` on linux and `C:\\config\\init.ps1` on windows - you would need to bind a volume for the script to use)
+- `INIT_BASH_SCRIPT` Optionally (linux image only) specify a path to a .ps1 script file to run before starting the runner agent (Default path is `/config/init.sh` on linux - you would need to bind a volume for the script to use)
 
 ### Installed Software
 - Chocolatey

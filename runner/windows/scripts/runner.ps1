@@ -1,5 +1,19 @@
 # PowerShell script for GitHub Actions runner registration and execution
-# filepath: x:\code\maui-docker\github-actions-runner\windows\scripts\runner.ps1
+
+# Check for and execute initialization script if it exists
+$initPwshPath = $env:INIT_PWSH_SCRIPT
+
+if (Test-Path $initPwshPath) {
+    Write-Host "Found initialization script at $initPwshPath, executing..."
+    try {
+        & $initPwshPath
+        Write-Host "Initialization script executed successfully."
+    } catch {
+        Write-Host "Error executing initialization script: $_"
+    }
+    break
+}
+
 
 # Environment variables
 $GITHUB_ORG = $env:GITHUB_ORG
