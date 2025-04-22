@@ -7,9 +7,9 @@ Param([String]$DotnetVersion="9.0",
     [Bool]$Push=$false)
 
 if ($DockerPlatform.StartsWith('linux/')) {
-    $dockerImageName = "build-linux"
+    $dockerImageName = "runner-linux"
 } else {
-    $dockerImageName = "build-windows"
+    $dockerImageName = "runner-windows"
 }
 # Use a more reliable method to import the common functions module
 # This handles paths with spaces better and is more explicit
