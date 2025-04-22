@@ -125,9 +125,8 @@ if ($Push) {
     # Push the image to the Docker repository
     $pushArgs = @(
         "push",
-        "${DockerRepository}/${dockerImageName}:dotnet$DotnetVersion",
-        "${DockerRepository}/${dockerImageName}:dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion",
-        "${DockerRepository}/${dockerImageName}:dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion-v$Version"
+        "--all-tags",
+        "${DockerRepository}/${dockerImageName}"
     )
 
     & docker $pushArgs

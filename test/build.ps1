@@ -77,8 +77,8 @@ if ($Push) {
     # Push the image to the Docker repository
     $pushArgs = @(
         "push",
-        "${DockerRepository}/${dockerImageName}:android${AndroidSdkApiLevel}-v${Version}",
-        "${DockerRepository}/${dockerImageName}:android${AndroidSdkApiLevel}"
+        "--all-tags",
+        "${DockerRepository}/${dockerImageName}"
     )
 
     & docker $pushArgs
