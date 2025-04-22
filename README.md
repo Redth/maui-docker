@@ -69,12 +69,23 @@ docker run `
 - `RUNNER_WORKDIR` Overrides the default runner work directory.
 
 
+### Installed Software
+- Chocolatey
+- Microsoft OpenJDK
+- Android SDK
+- .NET SDK
+- .NET Workloads
+
+> NOTE: The .NET Workloads are installed with the latest Workload set version for the given .NET SDK major version (eg: 9.0 SDK could have 9.0.203 as the latest workload set version).
+
+> NOTE: Versions for things like OpenJDK and Android SDK (including the individual SDK packages/components) are inferred from the Workloads' `data/WorkloadDependencies.json` files (in their Manifest nuget packages), which specify recommended versions and components to be installed for each workload.
+
 ------------------
 
 
 ## Building
 
-The images can be built with their respective `build.ps` files.  See the GitHub workflow yml files for examples.
+The images can be built with their respective `build.ps1` files.  See the GitHub workflow yml files for examples.
 
 
 -------------------
