@@ -1,0 +1,77 @@
+name: 🐋 Build Docker GitHub Actions Runner
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+env:
+  DOCKER_REPOSITORY: redth/maui-docker
+
+jobs:
+  build-windows:
+    name: 🐋 Build Windows Runner (API ${{ matrix.DOTNET_VERSION }})
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
+        DOTNET_VERSION: [ "9.0" ]
+
+    steps:
+    - name: 🛒 Checkout
+      uses: actions/checkout@v3
+
+    - name: 🐋 DockerHub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: 🔨 Build Docker Image
+      shell: pwsh
+      working-directory: ./runner/windows/
+      run: |
+        $Push = $false
+        if ("${{ github.ref }}" -eq "refs/heads/main") {
+          $Push = $true
+        }
+        ./build.ps1 -DotNetVersion ${{ matrix.DOTNET_VERSION }} `
+          -Version "${{ github.run_id }}" `
+          -DockerRepository "${{ env.DOCKER_REPOSITORY }}" `
+          -Load $true `
+          -Push $Push
+
+
+
+  build-linux:
+    name: 🐋 Build Linux Runner (API ${{ matrix.DOTNET_VERSION }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        DOTNET_VERSION: [ "9.0" ]
+
+    steps:
+    - name: 🛒 Checkout
+      uses: actions/checkout@v3
+
+    - name: 🐋 DockerHub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: 🔨 Build Docker Image
+      shell: pwsh
+      working-directory: ./runner/linux/
+      run: |
+        $Push = $false
+        if ("${{ github.ref }}" -eq "refs/heads/main") {
+          $Push = $true
+        }
+        ./build.ps1 -DotNetVersion ${{ matrix.DOTNET_VERSION }} `
+          -Version "${{ github.run_id }}" `
+          -DockerRepository "${{ env.DOCKER_REPOSITORY }}" `
+          -Load $true `
+          -Push $Push
