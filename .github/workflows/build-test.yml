@@ -44,9 +44,6 @@ jobs:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
 
-    - name: 🔢 Set Version
-      run: echo "version=${{ github.run_id }}" >> $GITHUB_ENV
-
     - name: 🔨 Build Docker Image
       shell: pwsh
       working-directory: ./test/
@@ -57,8 +54,8 @@ jobs:
         }
         ./build.ps1 `
           -AndroidSdkApiLevel ${{ matrix.ANDROID_SDK_API_LEVEL }} `
-          -DockerRepository ${{ env.DOCKER_REPOSITORY }} `
-          -Version ${{ env.version }} `
+          -DockerRepository "${{ env.DOCKER_REPOSITORY }}" `
+          -Version "${{ github.run_id }}" `
           -Load $true `
           -Push $Push
 
