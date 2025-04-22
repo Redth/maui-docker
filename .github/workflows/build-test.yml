@@ -1,4 +1,4 @@
-name: 🐋 Build Docker Images
+name: 🐋 Build Docker Test Image
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    name: 🐋 Android/Appium/Emulator (API ${{ matrix.ANDROID_SDK_API_LEVEL }})
+    name: 🐋 Build Linux Test Image (API ${{ matrix.ANDROID_SDK_API_LEVEL }})
     runs-on: ubuntu-latest
 
     strategy:
@@ -30,10 +30,7 @@ jobs:
 
     - name: 🔨 Build Docker Image
       shell: pwsh
-      run: ./testing/build.ps1 -AndroidSdkApiLevel ${{ matrix.ANDROID_SDK_API_LEVEL }} -Version ${{ env.version }}
+      working-directory: ./test/
+      run: ./build.ps1 -AndroidSdkApiLevel ${{ matrix.ANDROID_SDK_API_LEVEL }} -Version ${{ env.version }} -Load $true -Push $true
 
-    - name: 🚢 Push Docker Image
-      run: |
-        docker push redth/maui-docker:android_appium_emulator_${{ matrix.ANDROID_SDK_API_LEVEL }}_${{env.version}}
-        docker push redth/maui-docker:android_appium_emulator_${{ matrix.ANDROID_SDK_API_LEVEL }}
 

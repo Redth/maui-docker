@@ -1,8 +1,7 @@
 # Use .NET SDK base image
 FROM mcr.microsoft.com/dotnet/sdk:9.0-noble
 
-# Install Android SDK Tool
-RUN dotnet tool install -g AndroidSdk.Tool
+ARG TARGETARCH
 
 # Set build arguments
 ARG GITHUB_ACTIONS_RUNNER_VERSION=2.323.0
@@ -10,13 +9,16 @@ ARG JDK_MAJOR_VERSION=17
 ARG ANDROID_SDK_API_LEVEL=35
 ARG ANDROID_SDK_BUILD_TOOLS_VERSION=33.0.3
 ARG ANDROID_SDK_CMDLINE_TOOLS_VERSION=13.0
+ARG DOTNET_VERSION=9.0
+ARG DOTNET_WORKLOADS_VERSION=9.0.203
 
-ENV GITHUB_ACTIONS_RUNNER_VERSION=${GITHUB_ACTIONS_RUNNER_VERSION}}
-
+ENV GITHUB_ACTIONS_RUNNER_VERSION=${GITHUB_ACTIONS_RUNNER_VERSION}
 ENV JDK_MAJOR_VERSION=${JDK_MAJOR_VERSION}
 ENV ANDROID_SDK_API_LEVEL=${ANDROID_SDK_API_LEVEL}
 ENV ANDROID_SDK_BUILD_TOOLS_VERSION=${ANDROID_SDK_BUILD_TOOLS_VERSION}
 ENV ANDROID_SDK_CMDLINE_TOOLS_VERSION=${ANDROID_SDK_CMDLINE_TOOLS_VERSION}
+ENV DOTNET_VERSION=${DOTNET_VERSION}
+ENV DOTNET_WORKLOADS_VERSION=${DOTNET_WORKLOADS_VERSION}
 
 # Set core environment variables
 ENV ANDROID_HOME=/home/mauiusr/.android \
@@ -62,9 +64,8 @@ RUN groupadd mauiusr \
   && echo 'mauiusr ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 
 # Add .NET tools to PATH and fix permissions
-RUN chmod -R +x /home/mauiusr/.dotnet/tools/* && \
-    chown -R 1400:1401 /home/mauiusr/.dotnet
-ENV PATH="/home/mauiusr/.dotnet/tools:${PATH}"
+#RUN chmod -R +x /home/mauiusr/.dotnet/tools/* && \
+#    chown -R 1400:1401 /home/mauiusr/.dotnet
 
 # Install MS OpenJDK
 RUN ubuntu_release=$(lsb_release -rs) && \
@@ -74,11 +75,19 @@ RUN ubuntu_release=$(lsb_release -rs) && \
     apt-get update && \
     apt-get install -y msopenjdk-${JDK_MAJOR_VERSION}
 
+# Install the Workloads
+RUN dotnet workload install maui-android --version ${DOTNET_WORKLOADS_VERSION}
+
 # Fix permissions on the log directory
 RUN chown -R 1400:1401 ${LOG_PATH}
 
 # Switch to mauiusr
 USER 1400:1401
+
+# Install Android SDK Tool
+RUN dotnet tool install -g AndroidSdk.Tool
+
+ENV PATH="/home/mauiusr/.dotnet/tools:${PATH}"
 
 # Set working directory
 WORKDIR /home/mauiusr
@@ -104,11 +113,15 @@ RUN android sdk accept-licenses --force --home="${ANDROID_HOME}"
 
 
 # Create a folder
-RUN mkdir actions-runner && cd actions-runner
+RUN mkdir actions-runner
+
+WORKDIR /home/mauiusr/actions-runner
+
 # Download the latest runner package
-RUN curl -o actions-runner-linux.tar.gz -L https://github.com/actions/runner/releases/download/v${GITHUB_ACTIONS_RUNNER_VERSION}/actions-runner-linux-x64-${ACTIONS_RGITHUB_ACTIONS_RUNNER_VERSIONUNNER_VERSION}.tar.gz
+RUN curl -o actions-runner-linux.tar.gz -L https://github.com/actions/runner/releases/download/v${GITHUB_ACTIONS_RUNNER_VERSION}/actions-runner-linux-x64-${GITHUB_ACTIONS_RUNNER_VERSION}.tar.gz
 # Extract the installer
 RUN tar xzf ./actions-runner-linux.tar.gz
+RUN rm -rf ./actions-runner-linux.tar.gz
 
 # Default command
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

@@ -1,7 +1,18 @@
-Param([String]$AndroidSdkApiLevel=35,
-      [String]$Version="latest",
-      [String]$MauiVersionPropsCommit="b2b2191462463e5239184b0a47ec0d0fe2d07e7d",
-      [Bool]$Load=$false) 
+Param(
+    [String]$DockerRepository="redth/maui-docker",
+    [String]$DockerPlatform="linux/amd64",
+    [String]$AndroidSdkApiLevel=35,
+    [String]$Version="latest",
+    [String]$MauiVersionPropsCommit="b2b2191462463e5239184b0a47ec0d0fe2d07e7d",
+    [Bool]$Load=$false) 
+
+if ($DockerPlatform.StartsWith('linux/')) {
+    $dockerImageName = "test-linux"
+} else {
+    # Error not supported platform
+    Write-Error "Unsupported Docker platform: $DockerPlatform"
+    exit 1
+}
 
 # Variables
 $MauiVersionPropsUrl = "https://raw.githubusercontent.com/dotnet/maui/$MauiVersionPropsCommit/eng/Versions.props"
@@ -44,8 +55,8 @@ $buildxArgs = @(
     "--build-arg", "APPIUM_VERSION=$env:MAUI_AppiumVersion",
     "--build-arg", "APPIUM_UIAUTOMATOR2_DRIVER_VERSION=$env:MAUI_AppiumUIAutomator2DriverVersion",
     "--build-arg", "JAVA_JDK_MAJOR_VERSION=$($env:MAUI_JavaJdkVersion.Split('.')[0])",
-    "-t", "redth/maui-docker:android_appium_emulator_${AndroidSdkApiLevel}_${Version}",
-    "-t", "redth/maui-docker:android_appium_emulator_${AndroidSdkApiLevel}"
+    "-t", "${DockerRepository}/${dockerImageName}:android${AndroidSdkApiLevel}-v${Version}",
+    "-t", "${DockerRepository}/${dockerImageName}:android${AndroidSdkApiLevel}"
 )
 
 if ($Load) {
@@ -54,10 +65,22 @@ if ($Load) {
 
 $buildxArgs += "."
 
-docker push redth/maui-docker:tagname
-
 # Execute the docker command with all arguments
 & docker $buildxArgs
 
 # Output information for debugging
 Write-Host "Docker buildx command completed with exit code: $LASTEXITCODE"
+
+
+
+if ($Push) {
+    # Push the image to the Docker repository
+    $pushArgs = @(
+        "push",
+        "${DockerRepository}/${dockerImageName}:android${AndroidSdkApiLevel}-v${Version}",
+        "${DockerRepository}/${dockerImageName}:android${AndroidSdkApiLevel}"
+    )
+
+    & docker $pushArgs
+    Write-Host "Docker push command completed with exit code: $LASTEXITCODE"
+}
