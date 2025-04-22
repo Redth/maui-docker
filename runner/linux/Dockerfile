@@ -48,6 +48,7 @@ RUN apt-get update && apt-get install -y \
     git \
     lsb-release \
     wget \
+    apt-transport-https software-properties-common \
     unzip \
     tree \
     socat supervisor \
@@ -74,13 +75,16 @@ RUN groupadd mauiusr \
 #RUN chmod -R +x /home/mauiusr/.dotnet/tools/* && \
 #    chown -R 1400:1401 /home/mauiusr/.dotnet
 
-# Install MS OpenJDK
-RUN ubuntu_release=$(lsb_release -rs) && \
-    wget "https://packages.microsoft.com/config/ubuntu/${ubuntu_release}/packages-microsoft-prod.deb" -O packages-microsoft-prod.deb && \
-    dpkg -i packages-microsoft-prod.deb && \
-    rm packages-microsoft-prod.deb && \
-    apt-get update && \
-    apt-get install -y msopenjdk-${JDK_MAJOR_VERSION}
+# Install Microsoft Packages: MS OpenJDK and Powershell
+RUN ubuntu_release=$(lsb_release -rs) \
+    && wget "https://packages.microsoft.com/config/ubuntu/${ubuntu_release}/packages-microsoft-prod.deb" -O packages-microsoft-prod.deb \
+    && dpkg -i packages-microsoft-prod.deb \
+    && rm packages-microsoft-prod.deb \
+    && apt-get update \
+    && apt-get install -y msopenjdk-${JDK_MAJOR_VERSION} powershell \
+    && apt autoremove -y \
+    && apt clean all \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install the Workloads
 RUN dotnet workload install maui-android --version ${DOTNET_WORKLOADS_VERSION}
