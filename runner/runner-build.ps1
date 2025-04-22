@@ -1,15 +1,15 @@
 Param([String]$DotnetVersion="9.0",
     [String]$WorkloadSetVersion="",
-    [String]$DockerRepository="redth/maui-docker",
+    [String]$DockerRepository="redth/maui-actions-runner",
     [String]$DockerPlatform="windows/amd64",
     [String]$Version="latest",
     [Bool]$Load=$false,
     [Bool]$Push=$false)
 
 if ($DockerPlatform.StartsWith('linux/')) {
-    $dockerImageName = "runner-linux"
+    $dockerTagBase = "linux"
 } else {
-    $dockerImageName = "runner-windows"
+    $dockerTagBase = "windows"
 }
 # Use a more reliable method to import the common functions module
 # This handles paths with spaces better and is more explicit
@@ -81,9 +81,9 @@ if ($DockerPlatform.StartsWith('linux/')) {
         "--build-arg", "ANDROID_SDK_CMDLINE_TOOLS_VERSION=$androidCmdLineToolsVersion",
         "--build-arg", "JDK_MAJOR_VERSION=$androidJdkMajorVersion",
         "--build-arg", "DOTNET_WORKLOADS_VERSION=$dotnetCommandWorkloadSetVersion",
-        "-t", "${DockerRepository}/${dockerImageName}:dotnet$DotnetVersion",
-        "-t", "${DockerRepository}/${dockerImageName}:dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion",
-        "-t", "${DockerRepository}/${dockerImageName}:dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion-v$Version"
+        "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion",
+        "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion",
+        "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion-v$Version"
         
         if ($Load) {
             $buildxArgs += "--load"
@@ -97,9 +97,9 @@ if ($DockerPlatform.StartsWith('linux/')) {
         "--build-arg", "ANDROID_SDK_CMDLINE_TOOLS_VERSION=$androidCmdLineToolsVersion",
         "--build-arg", "JDK_MAJOR_VERSION=$androidJdkMajorVersion",
         "--build-arg", "DOTNET_WORKLOADS_VERSION=$dotnetCommandWorkloadSetVersion",
-        "-t", "${DockerRepository}/${dockerImageName}:dotnet$DotnetVersion",
-        "-t", "${DockerRepository}/${dockerImageName}:dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion",
-        "-t", "${DockerRepository}/${dockerImageName}:dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion-v$Version"
+        "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion",
+        "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion",
+        "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion-v$Version"
     )
 }
 
@@ -126,7 +126,7 @@ if ($Push) {
     $pushArgs = @(
         "push",
         "--all-tags",
-        "${DockerRepository}/${dockerImageName}"
+        "${DockerRepository}"
     )
 
     & docker $pushArgs

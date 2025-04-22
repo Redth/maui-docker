@@ -1,5 +1,5 @@
 Param(
-    [String]$DockerRepository="redth/maui-docker",
+    [String]$DockerRepository="redth/maui-testing",
     [String]$DockerPlatform="linux/amd64",
     [String]$AndroidSdkApiLevel=35,
     [String]$Version="latest",
@@ -7,7 +7,7 @@ Param(
     [Bool]$Load=$false) 
 
 if ($DockerPlatform.StartsWith('linux/')) {
-    $dockerImageName = "test-linux"
+    $dockerTagBase = "appium-emulator-linux"
 } else {
     # Error not supported platform
     Write-Error "Unsupported Docker platform: $DockerPlatform"
@@ -55,8 +55,8 @@ $buildxArgs = @(
     "--build-arg", "APPIUM_VERSION=$env:MAUI_AppiumVersion",
     "--build-arg", "APPIUM_UIAUTOMATOR2_DRIVER_VERSION=$env:MAUI_AppiumUIAutomator2DriverVersion",
     "--build-arg", "JAVA_JDK_MAJOR_VERSION=$($env:MAUI_JavaJdkVersion.Split('.')[0])",
-    "-t", "${DockerRepository}/${dockerImageName}:android${AndroidSdkApiLevel}-v${Version}",
-    "-t", "${DockerRepository}/${dockerImageName}:android${AndroidSdkApiLevel}"
+    "-t", "${DockerRepository}:${dockerImageName}-android${AndroidSdkApiLevel}-v${Version}",
+    "-t", "${DockerRepository}:${dockerImageName}-android${AndroidSdkApiLevel}"
 )
 
 if ($Load) {
@@ -78,7 +78,7 @@ if ($Push) {
     $pushArgs = @(
         "push",
         "--all-tags",
-        "${DockerRepository}/${dockerImageName}"
+        "${DockerRepository}"
     )
 
     & docker $pushArgs

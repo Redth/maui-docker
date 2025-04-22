@@ -7,7 +7,7 @@ on:
   pull_request:
 
 env:
-  DOCKER_REPOSITORY: redth/maui-docker
+  DOCKER_REPOSITORY: redth/maui-testing
   ALL_API_LEVELS: '[23, 24, 25, 26, 28, 29, 30, 31, 32, 33, 34, 35]'
   PR_API_LEVELS: '[35]'
 
