@@ -93,7 +93,7 @@ function Get-NuGetPackageContent {
         $envTemp = "./_temp"
     }
 
-    $tempDir = Join-Path "$env:TEMP" "nuget_extract_$(Get-Random)"
+    $tempDir = Join-Path $envTemp "nuget_extract_$(Get-Random)"
     New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
     
     $nupkgPath = Join-Path $tempDir "$PackageId.$Version.nupkg"
