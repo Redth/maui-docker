@@ -106,10 +106,10 @@ if ($DockerPlatform.StartsWith('linux/')) {
 
 if ($DockerPlatform.StartsWith('linux/')) {
     $buildxArgs += "-f"
-    $buildxArgs += "$PSScriptRoot\\linux\\Dockerfile"
+    $buildxArgs += "$PSScriptRoot/linux/Dockerfile"
 } else {
     $buildxArgs += "-f"
-    $buildxArgs += "$PSScriptRoot\\windows\\Dockerfile"
+    $buildxArgs += "$PSScriptRoot/windows/Dockerfile"
 }
 
 $buildxArgs += "."
