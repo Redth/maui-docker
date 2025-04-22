@@ -1,32 +1,25 @@
 #!/usr/bin/bash
 
+# Use environment variables with defaults to ensure we don't have empty values
+GITHUB_ORG=${GITHUB_ORG:-""}
+GITHUB_REPO=${GITHUB_REPO:-""}
+GITHUB_TOKEN=${GITHUB_TOKEN:-""}
+
 INIT_PWSH_SCRIPT=${INIT_PWSH_SCRIPT:-""}
 INIT_BASH_SCRIPT=${INIT_BASH_SCRIPT:-""}
 
 # Check for and execute initialization scripts if they exist
 if [ -f "$INIT_BASH_SCRIPT" ]; then
   echo "Found initialization script at $INIT_BASH_SCRIPT, executing..."
-  if [ -x "$INIT_BASH_SCRIPT" ]; then
-    # If the script is executable, run it directly
-    /usr/bin/bash "$INIT_BASH_SCRIPT"
-  fi
+  /usr/bin/bash "$INIT_BASH_SCRIPT"
   echo "Initialization script executed successfully."
 fi
 
 if [ -f "$INIT_PWSH_SCRIPT" ]; then
   echo "Found initialization script at $INIT_PWSH_SCRIPT, executing..."
-  if [ -x "$INIT_PWSH_SCRIPT" ]; then
-    # If the script is executable, run it directly
-    /usr/bin/pwsh "$INIT_PWSH_SCRIPT"
-  fi
+  /usr/bin/pwsh "$INIT_PWSH_SCRIPT"
   echo "Initialization script executed successfully."
 fi
-
-
-# Use environment variables with defaults to ensure we don't have empty values
-GITHUB_ORG=${GITHUB_ORG:-""}
-GITHUB_REPO=${GITHUB_REPO:-""}
-GITHUB_TOKEN=${GITHUB_TOKEN:-""}
 
 # Log environment variables for debugging
 echo "GITHUB_ORG: ${GITHUB_ORG}"
@@ -103,6 +96,11 @@ echo "Disable adding the default self-hosted, platform, and architecture labels"
 ARGS+=("--no-default-labels")
 fi
 
+# Ensure workdir exists and has the correct permissions
+[[ ! -d "${_RUNNER_WORKDIR}" ]] && sudo mkdir -p "${_RUNNER_WORKDIR}"
+sudo chown -R 1400:1401 "${_RUNNER_WORKDIR}"
+
+
 echo "Configuring"
 ./config.sh \
     --url "${RUNNER_URL}" \
@@ -114,9 +112,6 @@ echo "Configuring"
     --unattended \
     --replace \
     "${ARGS[@]}"
-
-[[ ! -d "${_RUNNER_WORKDIR}" ]] && mkdir -p "${_RUNNER_WORKDIR}"
-
 
 cleanup() {
     echo "Removing runner..."
