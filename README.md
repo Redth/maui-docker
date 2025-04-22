@@ -1,6 +1,8 @@
 # maui-docker
 Docker images for MAUI development/building/testing
 
+
+
 ## Test Images
 
 Test images are designed to help quickly stand up containers that are ready to use for running UI Tests with Appium on the Android Emulator.  They come setup with Appium Server and the Android Emulator (for the given API level) both running and waiting when the container is started.
@@ -27,7 +29,28 @@ docker run `
 
 ### Variants
 
-Each Android API Level (21 through latest) has its own image variant.  You can specify different ones to use by the tag name (eg: `test-linux:android21` or `test-linux:android35`).
+Each Android API Level (23 through latest) has its own image variant.  You can specify different ones to use by the tag name (eg: `test-linux:android23` or `test-linux:android35`).
+
+![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-testing/appium-emulator-linux-android35?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-testing%2Ftags)
+
+<details>
+
+<summary>Show All Variants...</summary>
+
+- ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-testing/appium-emulator-linux-android23?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-testing%2Ftags)
+- ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-testing/appium-emulator-linux-android24?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-testing%2Ftags)
+- ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-testing/appium-emulator-linux-android25?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-testing%2Ftags)
+- ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-testing/appium-emulator-linux-android26?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-testing%2Ftags)
+- ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-testing/appium-emulator-linux-android28?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-testing%2Ftags)
+- ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-testing/appium-emulator-linux-android29?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-testing%2Ftags)
+- ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-testing/appium-emulator-linux-android30?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-testing%2Ftags)
+- ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-testing/appium-emulator-linux-android31?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-testing%2Ftags)
+- ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-testing/appium-emulator-linux-android32?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-testing%2Ftags)
+- ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-testing/appium-emulator-linux-android33?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-testing%2Ftags)
+- ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-testing/appium-emulator-linux-android34?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-testing%2Ftags)
+- ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-testing/appium-emulator-linux-android35?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-testing%2Ftags)
+ 
+</details>
 
 ### Docker and Nested Virtualization
 The emulator on this image requires nested virtualization to work correctly.  This is done by passing the `--device /dev/kvm` from the host device to the docker container.
@@ -44,6 +67,11 @@ Linux should work fine as long as you have [kvm virtualization support](https://
 --------------------
 
 ## GitHub Action Runner Images
+
+- Linux: ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-actions-runner/linux-dotnet9.0?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-actions-runner%2Ftags)
+- Windows: ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-actions-runner/windows-dotnet9.0?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-actions-runner%2Ftags)
+
+
 Runner images are intended to make it really easy to stand up self-hosted build agents with some .NET / MAUI SDK prerequisites installed.  They have the latest workload set installed for the given .NET SDK version.  They also install, configure (including self registration), and run the GitHub Action Runner service when the container starts.
 
 ## Usage:
