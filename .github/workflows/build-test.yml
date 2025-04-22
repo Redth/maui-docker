@@ -6,6 +6,9 @@ on:
       - main
   pull_request:
 
+env:
+  DOCKER_REPOSITORY: redth/maui-docker
+
 jobs:
   build:
     name: 🐋 Build Linux Test Image (API ${{ matrix.ANDROID_SDK_API_LEVEL }})
@@ -36,6 +39,11 @@ jobs:
         if ("${{ github.ref }}" -eq "refs/heads/main") {
           $Push = $true
         }
-        ./build.ps1 -AndroidSdkApiLevel ${{ matrix.ANDROID_SDK_API_LEVEL }} -Version ${{ env.version }} -Load $true -Push $Push
+        ./build.ps1 `
+          -AndroidSdkApiLevel ${{ matrix.ANDROID_SDK_API_LEVEL }} `
+          -DockerRepository ${{ env.DOCKER_REPOSITORY }} `
+          -Version ${{ env.version }} `
+          -Load $true `
+          -Push $Push
 
 

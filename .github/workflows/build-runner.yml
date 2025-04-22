@@ -6,6 +6,9 @@ on:
       - main
   pull_request:
 
+env:
+  DOCKER_REPOSITORY: redth/maui-docker
+
 jobs:
   build-windows:
     name: 🐋 Build Windows Runner (API ${{ matrix.DOTNET_VERSION }})
