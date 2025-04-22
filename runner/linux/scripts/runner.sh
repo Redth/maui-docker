@@ -1,11 +1,24 @@
 #!/usr/bin/bash
 
-GITHUB_ORG=$GITHUB_ORG
-GITHUB_REPO=$GITHUB_REPO
-GITHUB_TOKEN=$GITHUB_TOKEN
+# Use environment variables with defaults to ensure we don't have empty values
+GITHUB_ORG=${GITHUB_ORG:-""}
+GITHUB_REPO=${GITHUB_REPO:-""}
+GITHUB_TOKEN=${GITHUB_TOKEN:-""}
 
+# Log environment variables for debugging
 echo "GITHUB_ORG: ${GITHUB_ORG}"
 echo "GITHUB_REPO: ${GITHUB_REPO}"
+
+# Check if required environment variables are set
+if [ -z "$GITHUB_ORG" ] || [ "$GITHUB_ORG" == "" ]; then
+    echo "ERROR: GITHUB_ORG environment variable is not set"
+    exit 1
+fi
+
+if [ -z "$GITHUB_TOKEN" ] || [ "$GITHUB_TOKEN" == "" ]; then
+    echo "ERROR: GITHUB_TOKEN environment variable is not set"
+    exit 1
+fi
 
 # Check if GITHUB_REPO is specified and use the appropriate API endpoint
 if [ -z "$GITHUB_REPO" ] || [ "$GITHUB_REPO" == "" ]; then

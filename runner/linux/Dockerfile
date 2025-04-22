@@ -20,6 +20,13 @@ ENV ANDROID_SDK_CMDLINE_TOOLS_VERSION=${ANDROID_SDK_CMDLINE_TOOLS_VERSION}
 ENV DOTNET_VERSION=${DOTNET_VERSION}
 ENV DOTNET_WORKLOADS_VERSION=${DOTNET_WORKLOADS_VERSION}
 
+
+ENV GITHUB_ORG=""
+ENV GITHUB_REPO=""
+ENV GITHUB_TOKEN=""
+ENV RUNNER_NAME_PREFIX="maui-runner"
+ENV LABELS=""
+
 # Set core environment variables
 ENV ANDROID_HOME=/home/mauiusr/.android \
     ANDROID_SDK_HOME=/home/mauiusr/.android \
@@ -110,7 +117,6 @@ RUN android sdk list --installed --format=json > /home/mauiusr/sdk_list.json
 
 # Accept Android Licenses
 RUN android sdk accept-licenses --force --home="${ANDROID_HOME}"
-
 
 # Create a folder
 RUN mkdir actions-runner
