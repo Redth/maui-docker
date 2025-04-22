@@ -12,13 +12,27 @@ env:
   PR_API_LEVELS: '[35]'
 
 jobs:
+  determine-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      api-levels: ${{ steps.set-matrix.outputs.api-levels }}
+    steps:
+      - id: set-matrix
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "api-levels=${{ env.ALL_API_LEVELS }}" >> $GITHUB_OUTPUT
+          else
+            echo "api-levels=${{ env.PR_API_LEVELS }}" >> $GITHUB_OUTPUT
+          fi
+
   build:
+    needs: determine-matrix
     name: 🐋 Build Linux Test Image (API ${{ matrix.ANDROID_SDK_API_LEVEL }})
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
-        ANDROID_SDK_API_LEVEL: ${{ fromJson(github.ref == 'refs/heads/main' && env.ALL_API_LEVELS || env.PR_API_LEVELS) }}
+        ANDROID_SDK_API_LEVEL: ${{ fromJson(needs.determine-matrix.outputs.api-levels) }}
 
     steps:
     - name: 🛒 Checkout
@@ -37,7 +51,10 @@ jobs:
       shell: pwsh
       working-directory: ./test/
       run: |
-        $Push = ${{ github.ref == 'refs/heads/main' }}
+        $Push = $false
+        if ("${{ github.ref }}" -eq "refs/heads/main") {
+          $Push = $true
+        }
         ./build.ps1 `
           -AndroidSdkApiLevel ${{ matrix.ANDROID_SDK_API_LEVEL }} `
           -DockerRepository ${{ env.DOCKER_REPOSITORY }} `
