@@ -6,6 +6,11 @@ on:
       - main
   pull_request:
   workflow_dispatch:
+    inputs:
+      workload_set_version:
+        description: 'Specific workload set version to use'
+        required: false
+        type: string
 
 env:
   DOCKER_REPOSITORY: redth/maui-actions-runner
@@ -37,11 +42,22 @@ jobs:
         if ("${{ github.ref }}" -eq "refs/heads/main") {
           $Push = $true
         }
-        ./build.ps1 -DotNetVersion ${{ matrix.DOTNET_VERSION }} `
-          -Version "${{ github.run_id }}" `
-          -DockerRepository "${{ env.DOCKER_REPOSITORY }}" `
-          -Load $true `
-          -Push $Push
+        
+        # Build arguments
+        $buildArgs = @(
+          "-DotNetVersion", "${{ matrix.DOTNET_VERSION }}"
+          "-Version", "${{ github.run_id }}"
+          "-DockerRepository", "${{ env.DOCKER_REPOSITORY }}"
+          "-Load", $true
+          "-Push", $Push
+        )
+        
+        # Add workload set version if specified
+        if ("${{ inputs.workload_set_version }}" -ne "") {
+          $buildArgs += "-WorkloadSetVersion", "${{ inputs.workload_set_version }}"
+        }
+        
+        ./build.ps1 @buildArgs
 
 
 
@@ -71,8 +87,19 @@ jobs:
         if ("${{ github.ref }}" -eq "refs/heads/main") {
           $Push = $true
         }
-        ./build.ps1 -DotNetVersion ${{ matrix.DOTNET_VERSION }} `
-          -Version "${{ github.run_id }}" `
-          -DockerRepository "${{ env.DOCKER_REPOSITORY }}" `
-          -Load $true `
-          -Push $Push
+        
+        # Build arguments
+        $buildArgs = @(
+          "-DotNetVersion", "${{ matrix.DOTNET_VERSION }}"
+          "-Version", "${{ github.run_id }}"
+          "-DockerRepository", "${{ env.DOCKER_REPOSITORY }}"
+          "-Load", $true
+          "-Push", $Push
+        )
+        
+        # Add workload set version if specified
+        if ("${{ inputs.workload_set_version }}" -ne "") {
+          $buildArgs += "-WorkloadSetVersion", "${{ inputs.workload_set_version }}"
+        }
+        
+        ./build.ps1 @buildArgs
