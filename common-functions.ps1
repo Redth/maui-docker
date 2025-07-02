@@ -530,3 +530,46 @@ function Get-WorkloadInfo {
     
     return $result
 }
+
+# Function to get the latest version of an npm package
+function Get-LatestNpmPackageVersion {
+    param (
+        [string]$PackageName
+    )
+    
+    Write-Host "Getting latest version for npm package: $PackageName"
+    
+    try {
+        # Use npm registry API to get package information
+        $registryUrl = "https://registry.npmjs.org/$PackageName"
+        $response = Invoke-RestMethod -Uri $registryUrl -Headers @{ "Accept" = "application/json" }
+        
+        # Get the latest version from the dist-tags
+        $latestVersion = $response.'dist-tags'.latest
+        
+        if ($latestVersion) {
+            Write-Host "Latest version of ${PackageName}: $latestVersion"
+            return $latestVersion
+        } else {
+            Write-Warning "Could not find latest version for package: $PackageName"
+            return $null
+        }
+    }
+    catch {
+        Write-Warning "Error getting npm package version for ${PackageName}: $($_.Exception.Message)"
+        return $null
+    }
+}
+
+# Function to get latest Appium-related package versions
+function Get-LatestAppiumVersions {
+    Write-Host "Getting latest Appium package versions from npm..."
+    
+    $appiumVersion = Get-LatestNpmPackageVersion -PackageName "appium"
+    $uiAutomator2Version = Get-LatestNpmPackageVersion -PackageName "appium-uiautomator2-driver"
+    
+    return @{
+        AppiumVersion = $appiumVersion
+        UIAutomator2DriverVersion = $uiAutomator2Version
+    }
+}

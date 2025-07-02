@@ -69,13 +69,18 @@ jobs:
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
-          console.log('Triggering build-test workflow');
+          const workloadVersion = '${{ needs.check-updates.outputs.workload-set-version }}';
+          
+          console.log(`Triggering build-test workflow for workload set version: ${workloadVersion}`);
           
           await github.rest.actions.createWorkflowDispatch({
             owner: context.repo.owner,
             repo: context.repo.repo,
             workflow_id: 'build-test.yml',
-            ref: 'main'
+            ref: 'main',
+            inputs: {
+              workload_set_version: workloadVersion
+            }
           });
 
   notify-results:
@@ -101,7 +106,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "✅ New workload set version detected!" >> $GITHUB_STEP_SUMMARY
           echo "   - Runner builds triggered with new workload set version" >> $GITHUB_STEP_SUMMARY
-          echo "   - Test builds triggered (uses MAUI versions independently)" >> $GITHUB_STEP_SUMMARY
+          echo "   - Test builds triggered with workload-based Android SDK dependencies" >> $GITHUB_STEP_SUMMARY
         else
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "ℹ️ No new workload set version found. All builds are up to date." >> $GITHUB_STEP_SUMMARY
