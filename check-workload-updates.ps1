@@ -76,16 +76,51 @@ function Write-HostWithPrefix {
 try {
     Write-HostWithPrefix "Checking for latest .NET $DotnetVersion workload set..."
     
-    # Get comprehensive workload information
-    $workloadInfo = Get-WorkloadInfo -DotnetVersion $DotnetVersion -IncludeAndroid -DockerPlatform "linux/amd64"
+    # Initialize variables
+    $triggerBuilds = $false
+    $newVersion = $false
+    $errorMessage = $null
+    $hasLinuxBuild = $false
+    $hasWindowsBuild = $false
+    $linuxTag = ""
+    $windowsTag = ""
+    $latestVersion = ""
+    $dotnetCommandWorkloadSetVersion = ""
     
-    if (-not $workloadInfo) {
-        Write-Error "Failed to get workload information for .NET $DotnetVersion"
+    # Get comprehensive workload information
+    # First try the simple approach
+    Write-HostWithPrefix "Trying to find latest workload set..."
+    $latestWorkloadSet = Find-LatestWorkloadSet -DotnetVersion $DotnetVersion
+    
+    if ($latestWorkloadSet) {
+        $latestVersion = $latestWorkloadSet.version
+        $dotnetCommandWorkloadSetVersion = Convert-ToWorkloadVersion -NuGetVersion $latestVersion
+        Write-HostWithPrefix "Using simple workload set approach"
+    } else {
+        Write-HostWithPrefix "Simple approach failed, trying comprehensive workload info..."
+        $workloadInfo = Get-WorkloadInfo -DotnetVersion $DotnetVersion -IncludeAndroid -DockerPlatform "linux/amd64"
+        
+        if (-not $workloadInfo) {
+            Write-Error "Failed to get workload information for .NET $DotnetVersion"
+            exit 1
+        }
+        
+        Write-HostWithPrefix "Workload info retrieved successfully"
+        Write-HostWithPrefix "Available properties: $($workloadInfo.Keys -join ', ')"
+        
+        $latestVersion = $workloadInfo.WorkloadSetVersion
+        $dotnetCommandWorkloadSetVersion = $workloadInfo.DotnetCommandWorkloadSetVersion
+    }
+    
+    if (-not $latestVersion) {
+        Write-Error "WorkloadSetVersion is null or empty in workload info"
         exit 1
     }
     
-    $latestVersion = $workloadInfo.WorkloadSetVersion
-    $dotnetCommandWorkloadSetVersion = $workloadInfo.DotnetCommandWorkloadSetVersion
+    if (-not $dotnetCommandWorkloadSetVersion) {
+        Write-Error "DotnetCommandWorkloadSetVersion is null or empty in workload info"
+        exit 1
+    }
     
     Write-HostWithPrefix "Latest workload set version: $latestVersion"
     Write-HostWithPrefix "Dotnet command workload set version: $dotnetCommandWorkloadSetVersion"
@@ -99,14 +134,6 @@ try {
     
     # Check existing Docker Hub tags
     Write-HostWithPrefix "Checking existing tags in Docker Hub for $DockerRepository..."
-    
-    $triggerBuilds = $false
-    $newVersion = $false
-    $errorMessage = $null
-    $hasLinuxBuild = $false
-    $hasWindowsBuild = $false
-    $linuxTag = ""
-    $windowsTag = ""
     
     try {
         # Get tags from Docker Hub API
@@ -153,6 +180,13 @@ try {
         $errorMessage = $_.Exception.Message
         Write-Warning "❌ Failed to check Docker Hub tags: $errorMessage"
         Write-HostWithPrefix "🔄 Assuming we need to build (fail-safe approach)"
+        
+        # In error case, still set the tag values if we have them
+        if ($latestVersion -and $dotnetCommandWorkloadSetVersion) {
+            $linuxTag = $TagPattern -replace '\{platform\}', 'linux' -replace '\{dotnet_version\}', $DotnetVersion -replace '\{workload_version\}', $dotnetCommandWorkloadSetVersion
+            $windowsTag = $TagPattern -replace '\{platform\}', 'windows' -replace '\{dotnet_version\}', $DotnetVersion -replace '\{workload_version\}', $dotnetCommandWorkloadSetVersion
+        }
+        
         $triggerBuilds = $true
         $newVersion = $true
     }
@@ -195,5 +229,37 @@ try {
 } catch {
     Write-Error "❌ Script failed: $($_.Exception.Message)"
     Write-Error "Stack trace: $($_.ScriptStackTrace)"
+    
+    # Set default values for output
+    if (-not $latestVersion) { $latestVersion = "unknown" }
+    if (-not $dotnetCommandWorkloadSetVersion) { $dotnetCommandWorkloadSetVersion = "unknown" }
+    if (-not $linuxTag) { $linuxTag = "unknown" }
+    if (-not $windowsTag) { $windowsTag = "unknown" }
+    
+    $result = [PSCustomObject]@{
+        LatestVersion = $latestVersion
+        DotnetCommandWorkloadSetVersion = $dotnetCommandWorkloadSetVersion
+        LinuxTag = $linuxTag
+        WindowsTag = $windowsTag
+        HasLinuxBuild = $false
+        HasWindowsBuild = $false
+        TriggerBuilds = $true
+        NewVersion = $true
+        ErrorMessage = $_.Exception.Message
+        DockerRepository = $DockerRepository
+        DotnetVersion = $DotnetVersion
+    }
+    
+    if ($OutputFormat -eq "github-actions") {
+        Write-GitHubOutput "trigger-builds" "true"
+        Write-GitHubOutput "new-version" "true"
+        Write-GitHubOutput "workload-set-version" $latestVersion
+        Write-GitHubOutput "dotnet-command-workload-set-version" $dotnetCommandWorkloadSetVersion
+        Write-GitHubOutput "linux-tag" $linuxTag
+        Write-GitHubOutput "windows-tag" $windowsTag
+    } else {
+        return $result
+    }
+    
     exit 1
 }
