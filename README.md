@@ -1,6 +1,42 @@
 # maui-docker
 Docker images for MAUI development/building/testing
 
+This repository provides three types of Docker images for .NET MAUI development:
+
+1. **Base Images** - MAUI development environment without GitHub Actions runner
+2. **Runner Images** - Base images + GitHub Actions runner for CI/CD
+3. **Test Images** - Ready-to-use testing environment with Appium and Android Emulator
+
+## Base Images
+
+Base images provide a complete .NET MAUI development environment without the GitHub Actions runner. These are perfect for general development containers, custom CI/CD setups, or as foundation images for other specialized containers.
+
+- Linux: ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-docker-base/linux-latest?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-docker-base%2Ftags)
+- Windows: ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-docker-base/windows-latest?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-docker-base%2Ftags)
+
+### Usage:
+
+```pwsh
+# Run a Linux development container
+docker run -it redth/maui-docker-base:linux-latest bash
+
+# Run a Windows development container  
+docker run -it redth/maui-docker-base:windows-latest powershell
+
+# Use as base image
+FROM redth/maui-docker-base:linux-latest
+# Add your custom requirements here
+```
+
+### What's Included:
+- **.NET SDK** with MAUI workloads
+- **Android SDK** with latest tools and API levels
+- **Java/OpenJDK** for Android development
+- **PowerShell** (cross-platform)
+- **Development tools** (Git, build tools, etc.)
+
+See [base/README.md](base/README.md) for detailed documentation.
+
 
 
 ## Test Images
@@ -73,11 +109,20 @@ Linux should work fine as long as you have [kvm virtualization support](https://
 
 ## GitHub Action Runner Images
 
+Runner images build upon the base images and add the GitHub Actions runner service. They're designed for self-hosted CI/CD scenarios where you need the full MAUI development stack.
+
 - Linux: ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-actions-runner/linux-dotnet9.0?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-actions-runner%2Ftags)
 - Windows: ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-actions-runner/windows-dotnet9.0?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-actions-runner%2Ftags)
 
+These images now derive from the base images, providing better separation of concerns and reduced duplication.
 
-Runner images are intended to make it really easy to stand up self-hosted build agents with some .NET / MAUI SDK prerequisites installed.  They have the latest workload set installed for the given .NET SDK version.  They also install, configure (including self registration), and run the GitHub Action Runner service when the container starts.
+```
+Base Image (MAUI Dev Environment) 
+    ↓
+Runner Image (Base + GitHub Actions Runner)
+```
+
+Runner images are intended to make it really easy to stand up self-hosted build agents with a complete .NET MAUI SDK environment. They have the latest workload set installed for the given .NET SDK version and automatically install, configure (including self registration), and run the GitHub Action Runner service when the container starts.
 
 ## Usage:
 
