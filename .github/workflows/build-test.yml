@@ -25,6 +25,8 @@ on:
         description: 'Specific Appium UIAutomator2 driver version to use (defaults to latest from npm)'
         required: false
         type: string
+  repository_dispatch:
+    types: [trigger-test-build]
 
 env:
   DOCKER_REPOSITORY: redth/maui-testing
@@ -36,10 +38,23 @@ jobs:
     outputs:
       matrix: ${{ steps.determine-matrix.outputs.matrix }}
       workload-api-levels: ${{ steps.get-workload-info.outputs.workload-api-levels }}
+      workload-set-version: ${{ steps.vars.outputs.workload_set_version }}
     
     steps:
     - name: 🛒 Checkout
       uses: actions/checkout@v4
+
+    - name: 🔧 Set Variables
+      id: vars
+      run: |
+        # Determine workload set version from either workflow_dispatch input or repository_dispatch payload
+        if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+          WORKLOAD_SET_VERSION="${{ github.event.client_payload.workload_set_version }}"
+        else
+          WORKLOAD_SET_VERSION="${{ inputs.workload_set_version }}"
+        fi
+        echo "workload_set_version=$WORKLOAD_SET_VERSION" >> $GITHUB_OUTPUT
+        echo "Using workload set version: $WORKLOAD_SET_VERSION"
     
     - name: 🔍 Get Workload Information
       id: get-workload-info
@@ -58,7 +73,7 @@ jobs:
         
         foreach ($dotnetVersion in $dotnetVersions) {
           Write-Host "Getting workload information for .NET $dotnetVersion"
-          $workloadInfo = Get-WorkloadInfo -DotnetVersion $dotnetVersion -WorkloadSetVersion "${{ inputs.workload_set_version }}" -IncludeAndroid -DockerPlatform "linux/amd64"
+          $workloadInfo = Get-WorkloadInfo -DotnetVersion $dotnetVersion -WorkloadSetVersion "${{ steps.vars.outputs.workload_set_version }}" -IncludeAndroid -DockerPlatform "linux/amd64"
           
           if ($workloadInfo -and $workloadInfo.Workloads["Microsoft.NET.Sdk.Android"] -and $workloadInfo.Workloads["Microsoft.NET.Sdk.Android"].Details) {
             $workloadApiLevel = $workloadInfo.Workloads["Microsoft.NET.Sdk.Android"].Details.ApiLevel
@@ -174,8 +189,8 @@ jobs:
         )
         
         # Add workload set version if specified
-        if ("${{ inputs.workload_set_version }}" -ne "") {
-          $buildArgs += "-WorkloadSetVersion", "${{ inputs.workload_set_version }}"
+        if ("${{ needs.get-workload-info.outputs.workload-set-version }}" -ne "") {
+          $buildArgs += "-WorkloadSetVersion", "${{ needs.get-workload-info.outputs.workload-set-version }}"
         }
         
         # Add .NET version from matrix

@@ -1,5 +1,9 @@
 name: 🔍 Check for Workload Updates
 
+permissions:
+  contents: read
+  actions: write
+
 on:
   schedule:
     - cron: '0 1 * * *'  # Daily at 1:00 AM UTC (before the build workflows)
@@ -62,15 +66,33 @@ jobs:
           
           console.log(`Triggering build-base workflow for workload set version: ${workloadVersion}`);
           
-          await github.rest.actions.createWorkflowDispatch({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            workflow_id: 'build-base.yml',
-            ref: 'main',
-            inputs: {
-              workload_set_version: workloadVersion
-            }
-          });
+          try {
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'build-base.yml',
+              ref: 'main',
+              inputs: {
+                workload_set_version: workloadVersion
+              }
+            });
+            console.log('✅ Successfully triggered build-base workflow');
+          } catch (error) {
+            console.log(`❌ Failed to trigger workflow: ${error.message}`);
+            console.log('🔄 Trying alternative approach with repository dispatch...');
+            
+            // Alternative: Use repository dispatch
+            await github.rest.repos.createDispatchEvent({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              event_type: 'trigger-base-build',
+              client_payload: {
+                workload_set_version: workloadVersion,
+                force_build: '${{ needs.check-updates.outputs.force-build }}'
+              }
+            });
+            console.log('✅ Successfully sent repository dispatch event');
+          }
 
   trigger-runner-build:
     name: 🚀 Trigger Runner Build
@@ -88,15 +110,33 @@ jobs:
           
           console.log(`Triggering build-runner workflow for workload set version: ${workloadVersion}`);
           
-          await github.rest.actions.createWorkflowDispatch({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            workflow_id: 'build-runner.yml',
-            ref: 'main',
-            inputs: {
-              workload_set_version: workloadVersion
-            }
-          });
+          try {
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'build-runner.yml',
+              ref: 'main',
+              inputs: {
+                workload_set_version: workloadVersion
+              }
+            });
+            console.log('✅ Successfully triggered build-runner workflow');
+          } catch (error) {
+            console.log(`❌ Failed to trigger workflow: ${error.message}`);
+            console.log('🔄 Trying alternative approach with repository dispatch...');
+            
+            // Alternative: Use repository dispatch
+            await github.rest.repos.createDispatchEvent({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              event_type: 'trigger-runner-build',
+              client_payload: {
+                workload_set_version: workloadVersion,
+                force_build: '${{ needs.check-updates.outputs.force-build }}'
+              }
+            });
+            console.log('✅ Successfully sent repository dispatch event');
+          }
 
   trigger-test-build:
     name: 🚀 Trigger Test Build
@@ -114,15 +154,33 @@ jobs:
           
           console.log(`Triggering build-test workflow for workload set version: ${workloadVersion}`);
           
-          await github.rest.actions.createWorkflowDispatch({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            workflow_id: 'build-test.yml',
-            ref: 'main',
-            inputs: {
-              workload_set_version: workloadVersion
-            }
-          });
+          try {
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'build-test.yml',
+              ref: 'main',
+              inputs: {
+                workload_set_version: workloadVersion
+              }
+            });
+            console.log('✅ Successfully triggered build-test workflow');
+          } catch (error) {
+            console.log(`❌ Failed to trigger workflow: ${error.message}`);
+            console.log('🔄 Trying alternative approach with repository dispatch...');
+            
+            // Alternative: Use repository dispatch
+            await github.rest.repos.createDispatchEvent({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              event_type: 'trigger-test-build',
+              client_payload: {
+                workload_set_version: workloadVersion,
+                force_build: '${{ needs.check-updates.outputs.force-build }}'
+              }
+            });
+            console.log('✅ Successfully sent repository dispatch event');
+          }
 
   notify-results:
     name: 📢 Notify Results
