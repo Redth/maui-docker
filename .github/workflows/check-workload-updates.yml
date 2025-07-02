@@ -40,12 +40,11 @@ jobs:
       id: check-versions
       shell: pwsh
       run: |
-        $forceBuildParam = ""
         if ("${{ inputs.force_build }}" -eq "true") {
-          $forceBuildParam = "-ForceBuild"
+          ./check-workload-updates.ps1 -DockerRepository "${{ env.DOCKER_REPOSITORY_RUNNER }}" -TestDockerRepository "${{ env.DOCKER_REPOSITORY_TEST }}" -BaseDockerRepository "${{ env.DOCKER_REPOSITORY_BASE }}" -ForceBuild
+        } else {
+          ./check-workload-updates.ps1 -DockerRepository "${{ env.DOCKER_REPOSITORY_RUNNER }}" -TestDockerRepository "${{ env.DOCKER_REPOSITORY_TEST }}" -BaseDockerRepository "${{ env.DOCKER_REPOSITORY_BASE }}"
         }
-        
-        ./check-workload-updates.ps1 -DockerRepository "${{ env.DOCKER_REPOSITORY_RUNNER }}" -TestDockerRepository "${{ env.DOCKER_REPOSITORY_TEST }}" -BaseDockerRepository "${{ env.DOCKER_REPOSITORY_BASE }}" $forceBuildParam
 
   trigger-base-build:
     name: 🚀 Trigger Base Build
