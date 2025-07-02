@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: '0 1 * * *'  # Daily at 1:00 AM UTC (before the build workflows)
   workflow_dispatch:
+    inputs:
+      force_build:
+        description: 'Force building and pushing of all images regardless of existing tags'
+        required: false
+        default: false
+        type: boolean
 
 env:
   DOCKER_REPOSITORY_BASE: redth/maui-build
@@ -24,6 +30,7 @@ jobs:
       has-linux-base-build: ${{ steps.check-versions.outputs.has-linux-base-build }}
       has-windows-base-build: ${{ steps.check-versions.outputs.has-windows-base-build }}
       has-any-base-build: ${{ steps.check-versions.outputs.has-any-base-build }}
+      force-build: ${{ steps.check-versions.outputs.force-build }}
     
     steps:
     - name: 🛒 Checkout
@@ -33,7 +40,12 @@ jobs:
       id: check-versions
       shell: pwsh
       run: |
-        ./check-workload-updates.ps1 -DockerRepository "${{ env.DOCKER_REPOSITORY_RUNNER }}" -TestDockerRepository "${{ env.DOCKER_REPOSITORY_TEST }}" -BaseDockerRepository "${{ env.DOCKER_REPOSITORY_BASE }}"
+        $forceBuildParam = ""
+        if ("${{ inputs.force_build }}" -eq "true") {
+          $forceBuildParam = "-ForceBuild"
+        }
+        
+        ./check-workload-updates.ps1 -DockerRepository "${{ env.DOCKER_REPOSITORY_RUNNER }}" -TestDockerRepository "${{ env.DOCKER_REPOSITORY_TEST }}" -BaseDockerRepository "${{ env.DOCKER_REPOSITORY_BASE }}" $forceBuildParam
 
   trigger-base-build:
     name: 🚀 Trigger Base Build
@@ -129,13 +141,21 @@ jobs:
         echo "- **Expected Windows tag:** ${{ needs.check-updates.outputs.windows-tag }}" >> $GITHUB_STEP_SUMMARY
         echo "- **New version found:** ${{ needs.check-updates.outputs.new-version }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Builds triggered:** ${{ needs.check-updates.outputs.trigger-builds }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Force build:** ${{ needs.check-updates.outputs.force-build }}" >> $GITHUB_STEP_SUMMARY
         
         if [[ "${{ needs.check-updates.outputs.trigger-builds }}" == "true" ]]; then
           echo "- **Base build status:** ${{ needs.trigger-base-build.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Runner build status:** ${{ needs.trigger-runner-build.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Test build status:** ${{ needs.trigger-test-build.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ New workload set version detected!" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ needs.check-updates.outputs.force-build }}" == "true" ]]; then
+            echo "🔄 Force build triggered!" >> $GITHUB_STEP_SUMMARY
+            echo "   - All images will be rebuilt regardless of existing tags" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ New workload set version detected!" >> $GITHUB_STEP_SUMMARY
+          fi
+          
           echo "   - Base images built with new workload set version" >> $GITHUB_STEP_SUMMARY
           echo "   - Runner builds triggered with new workload set version" >> $GITHUB_STEP_SUMMARY
           echo "   - Test builds triggered with workload-based Android SDK dependencies" >> $GITHUB_STEP_SUMMARY

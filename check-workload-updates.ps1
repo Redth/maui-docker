@@ -40,11 +40,18 @@
     The output format. Use "github-actions" for GitHub Actions environment variables,
     or "object" for PowerShell object output. Defaults to "github-actions".
 
+.PARAMETER ForceBuild
+    Force building and pushing of all images regardless of existing tags with the latest workload set versions.
+    When true, the script will always trigger builds even if the tags already exist.
+
 .EXAMPLE
     .\check-workload-updates.ps1
     
 .EXAMPLE
     .\check-workload-updates.ps1 -DotnetVersion "9.0" -DockerRepository "myrepo/myimage" -OutputFormat "object"
+
+.EXAMPLE
+    .\check-workload-updates.ps1 -ForceBuild -DotnetVersion "9.0"
 #>
 
 param(
@@ -68,7 +75,10 @@ param(
     
     [Parameter(Position = 6)]
     [ValidateSet("github-actions", "object")]
-    [string]$OutputFormat = "github-actions"
+    [string]$OutputFormat = "github-actions",
+    
+    [Parameter()]
+    [switch]$ForceBuild
 )
 
 # Import common functions
@@ -302,7 +312,12 @@ try {
         $hasAnyBuild = $hasLinuxBuild -or $hasWindowsBuild -or $hasTestBuilds -or $hasAnyBaseBuild
         Write-HostWithPrefix "Has any existing build (runner, test, or base): $hasAnyBuild"
         
-        if (-not $hasAnyBuild) {
+        # Check if we should force build regardless of existing tags
+        if ($ForceBuild) {
+            Write-HostWithPrefix "🔄 Force build parameter specified. Builds will be triggered regardless of existing tags."
+            $triggerBuilds = $true
+            $newVersion = $true
+        } elseif (-not $hasAnyBuild) {
             Write-HostWithPrefix "✅ New workload set version found! Builds should be triggered."
             $triggerBuilds = $true
             $newVersion = $true
@@ -330,6 +345,7 @@ try {
             $windowsTag = $TagPattern -replace '\{platform\}', 'windows' -replace '\{dotnet_version\}', $DotnetVersion -replace '\{workload_version\}', $dotnetCommandWorkloadSetVersion
         }
         
+        # Always trigger builds on error or when force build is specified
         $triggerBuilds = $true
         $newVersion = $true
     }
@@ -348,6 +364,7 @@ try {
         HasAnyBaseBuild = $hasAnyBaseBuild
         TriggerBuilds = $triggerBuilds
         NewVersion = $newVersion
+        ForceBuild = $ForceBuild.IsPresent
         ErrorMessage = $errorMessage
         DockerRepository = $DockerRepository
         TestDockerRepository = $TestDockerRepository
@@ -367,6 +384,7 @@ try {
         Write-GitHubOutput "has-linux-base-build" $hasLinuxBaseBuild.ToString().ToLower()
         Write-GitHubOutput "has-windows-base-build" $hasWindowsBaseBuild.ToString().ToLower()
         Write-GitHubOutput "has-any-base-build" $hasAnyBaseBuild.ToString().ToLower()
+        Write-GitHubOutput "force-build" $ForceBuild.IsPresent.ToString().ToLower()
         
         Write-HostWithPrefix "GitHub Actions outputs set:"
         Write-HostWithPrefix "  trigger-builds: $($triggerBuilds.ToString().ToLower())"
@@ -379,6 +397,7 @@ try {
         Write-HostWithPrefix "  has-linux-base-build: $($hasLinuxBaseBuild.ToString().ToLower())"
         Write-HostWithPrefix "  has-windows-base-build: $($hasWindowsBaseBuild.ToString().ToLower())"
         Write-HostWithPrefix "  has-any-base-build: $($hasAnyBaseBuild.ToString().ToLower())"
+        Write-HostWithPrefix "  force-build: $($ForceBuild.IsPresent.ToString().ToLower())"
     } else {
         return $result
     }
@@ -402,6 +421,7 @@ try {
         HasWindowsBuild = $false
         TriggerBuilds = $true
         NewVersion = $true
+        ForceBuild = $ForceBuild.IsPresent
         ErrorMessage = $_.Exception.Message
         DockerRepository = $DockerRepository
         DotnetVersion = $DotnetVersion
@@ -414,6 +434,7 @@ try {
         Write-GitHubOutput "dotnet-command-workload-set-version" $dotnetCommandWorkloadSetVersion
         Write-GitHubOutput "linux-tag" $linuxTag
         Write-GitHubOutput "windows-tag" $windowsTag
+        Write-GitHubOutput "force-build" $ForceBuild.IsPresent.ToString().ToLower()
     } else {
         return $result
     }
