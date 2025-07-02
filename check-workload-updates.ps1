@@ -18,6 +18,9 @@
 .PARAMETER TestDockerRepository
     The test Docker repository to check for existing tags. Defaults to "redth/maui-testing".
 
+.PARAMETER BaseDockerRepository
+    The base Docker repository to check for existing tags. Defaults to "redth/maui-build".
+
 .PARAMETER TagPattern
     The tag pattern to look for. The script will replace placeholders with actual values:
     - {platform}: 'linux' or 'windows' 
@@ -55,12 +58,15 @@ param(
     [string]$TestDockerRepository = "redth/maui-testing",
     
     [Parameter(Position = 3)]
-    [string]$TagPattern = "{platform}-dotnet{dotnet_version}-workloads{workload_version}",
+    [string]$BaseDockerRepository = "redth/maui-build",
     
     [Parameter(Position = 4)]
-    [string]$TestTagPattern = "{platform}-dotnet{dotnet_version}-workloads{workload_version}-android{api_level}",
+    [string]$TagPattern = "{platform}-dotnet{dotnet_version}-workloads{workload_version}",
     
     [Parameter(Position = 5)]
+    [string]$TestTagPattern = "{platform}-dotnet{dotnet_version}-workloads{workload_version}-android{api_level}",
+    
+    [Parameter(Position = 6)]
     [ValidateSet("github-actions", "object")]
     [string]$OutputFormat = "github-actions"
 )
@@ -140,6 +146,59 @@ function Test-TestRepositoryBuilds {
     } catch {
         Write-HostWithPrefix "Warning: Could not check test repository $Repository - $($_.Exception.Message)"
         return $false
+    }
+}
+
+# Function to check for existing base builds
+function Test-BaseRepositoryBuilds {
+    param(
+        [string]$Repository,
+        [string]$TagPattern,
+        [string]$DotnetVersion,
+        [string]$WorkloadVersion
+    )
+    
+    Write-HostWithPrefix "Checking base repository: $Repository"
+    
+    try {
+        # Get tags from Docker Hub API for base repository
+        $dockerHubUri = "https://registry.hub.docker.com/v2/repositories/$Repository/tags?page_size=100"
+        Write-HostWithPrefix "Querying Docker Hub API for base repo: $dockerHubUri"
+        
+        $tagsResponse = Invoke-RestMethod -Uri $dockerHubUri -TimeoutSec 30
+        $existingTags = $tagsResponse.results | ForEach-Object { $_.name }
+        
+        Write-HostWithPrefix "Found $($existingTags.Count) base repository tags"
+        
+        # Create base tag patterns for both platforms
+        $linuxBaseTag = $TagPattern -replace '\{platform\}', 'linux' -replace '\{dotnet_version\}', $DotnetVersion -replace '\{workload_version\}', $WorkloadVersion
+        $windowsBaseTag = $TagPattern -replace '\{platform\}', 'windows' -replace '\{dotnet_version\}', $DotnetVersion -replace '\{workload_version\}', $WorkloadVersion
+        
+        $hasLinuxBase = $existingTags -contains $linuxBaseTag
+        $hasWindowsBase = $existingTags -contains $windowsBaseTag
+        $hasAnyBase = $hasLinuxBase -or $hasWindowsBase
+        
+        Write-HostWithPrefix "Linux base tag: $linuxBaseTag - Exists: $hasLinuxBase"
+        Write-HostWithPrefix "Windows base tag: $windowsBaseTag - Exists: $hasWindowsBase"
+        Write-HostWithPrefix "Has any base builds: $hasAnyBase"
+        
+        return @{
+            HasLinuxBase = $hasLinuxBase
+            HasWindowsBase = $hasWindowsBase
+            HasAnyBase = $hasAnyBase
+            LinuxBaseTag = $linuxBaseTag
+            WindowsBaseTag = $windowsBaseTag
+        }
+        
+    } catch {
+        Write-HostWithPrefix "Warning: Could not check base repository $Repository - $($_.Exception.Message)"
+        return @{
+            HasLinuxBase = $false
+            HasWindowsBase = $false
+            HasAnyBase = $false
+            LinuxBaseTag = ""
+            WindowsBaseTag = ""
+        }
     }
 }
 
@@ -233,8 +292,15 @@ try {
         $hasTestBuilds = Test-TestRepositoryBuilds -Repository $TestDockerRepository -TagPattern $TestTagPattern -DotnetVersion $DotnetVersion -WorkloadVersion $dotnetCommandWorkloadSetVersion
         Write-HostWithPrefix "Has test builds: $hasTestBuilds"
         
-        $hasAnyBuild = $hasLinuxBuild -or $hasWindowsBuild -or $hasTestBuilds
-        Write-HostWithPrefix "Has any existing build (runner or test): $hasAnyBuild"
+        # Check base repository for builds
+        $baseBuilds = Test-BaseRepositoryBuilds -Repository $BaseDockerRepository -TagPattern $TagPattern -DotnetVersion $DotnetVersion -WorkloadVersion $dotnetCommandWorkloadSetVersion
+        $hasLinuxBaseBuild = $baseBuilds.HasLinuxBase
+        $hasWindowsBaseBuild = $baseBuilds.HasWindowsBase
+        $hasAnyBaseBuild = $baseBuilds.HasAnyBase
+        Write-HostWithPrefix "Has base builds: $hasAnyBaseBuild (Linux: $hasLinuxBaseBuild, Windows: $hasWindowsBaseBuild)"
+        
+        $hasAnyBuild = $hasLinuxBuild -or $hasWindowsBuild -or $hasTestBuilds -or $hasAnyBaseBuild
+        Write-HostWithPrefix "Has any existing build (runner, test, or base): $hasAnyBuild"
         
         if (-not $hasAnyBuild) {
             Write-HostWithPrefix "✅ New workload set version found! Builds should be triggered."
@@ -277,11 +343,15 @@ try {
         HasLinuxBuild = $hasLinuxBuild
         HasWindowsBuild = $hasWindowsBuild
         HasTestBuilds = $hasTestBuilds
+        HasLinuxBaseBuild = $hasLinuxBaseBuild
+        HasWindowsBaseBuild = $hasWindowsBaseBuild
+        HasAnyBaseBuild = $hasAnyBaseBuild
         TriggerBuilds = $triggerBuilds
         NewVersion = $newVersion
         ErrorMessage = $errorMessage
         DockerRepository = $DockerRepository
         TestDockerRepository = $TestDockerRepository
+        BaseDockerRepository = $BaseDockerRepository
         DotnetVersion = $DotnetVersion
     }
     
@@ -294,6 +364,9 @@ try {
         Write-GitHubOutput "linux-tag" $linuxTag
         Write-GitHubOutput "windows-tag" $windowsTag
         Write-GitHubOutput "has-test-builds" $hasTestBuilds.ToString().ToLower()
+        Write-GitHubOutput "has-linux-base-build" $hasLinuxBaseBuild.ToString().ToLower()
+        Write-GitHubOutput "has-windows-base-build" $hasWindowsBaseBuild.ToString().ToLower()
+        Write-GitHubOutput "has-any-base-build" $hasAnyBaseBuild.ToString().ToLower()
         
         Write-HostWithPrefix "GitHub Actions outputs set:"
         Write-HostWithPrefix "  trigger-builds: $($triggerBuilds.ToString().ToLower())"
@@ -303,6 +376,9 @@ try {
         Write-HostWithPrefix "  linux-tag: $linuxTag"
         Write-HostWithPrefix "  windows-tag: $windowsTag"
         Write-HostWithPrefix "  has-test-builds: $($hasTestBuilds.ToString().ToLower())"
+        Write-HostWithPrefix "  has-linux-base-build: $($hasLinuxBaseBuild.ToString().ToLower())"
+        Write-HostWithPrefix "  has-windows-base-build: $($hasWindowsBaseBuild.ToString().ToLower())"
+        Write-HostWithPrefix "  has-any-base-build: $($hasAnyBaseBuild.ToString().ToLower())"
     } else {
         return $result
     }

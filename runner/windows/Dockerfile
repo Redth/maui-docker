@@ -1,6 +1,6 @@
 # Use MAUI base image
 ARG BASE_IMAGE_TAG=latest
-ARG BASE_DOCKER_REPOSITORY=redth/maui-docker-base
+ARG BASE_DOCKER_REPOSITORY=redth/maui-build
 FROM ${BASE_DOCKER_REPOSITORY}:windows-${BASE_IMAGE_TAG}
 
 # Set build arguments for GitHub Actions Runner

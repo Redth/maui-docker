@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
 
 env:
+  DOCKER_REPOSITORY_BASE: redth/maui-build
   DOCKER_REPOSITORY_RUNNER: redth/maui-actions-runner
   DOCKER_REPOSITORY_TEST: redth/maui-testing
 
@@ -20,6 +21,9 @@ jobs:
       dotnet-command-workload-set-version: ${{ steps.check-versions.outputs.dotnet-command-workload-set-version }}
       linux-tag: ${{ steps.check-versions.outputs.linux-tag }}
       windows-tag: ${{ steps.check-versions.outputs.windows-tag }}
+      has-linux-base-build: ${{ steps.check-versions.outputs.has-linux-base-build }}
+      has-windows-base-build: ${{ steps.check-versions.outputs.has-windows-base-build }}
+      has-any-base-build: ${{ steps.check-versions.outputs.has-any-base-build }}
     
     steps:
     - name: 🛒 Checkout
@@ -29,11 +33,37 @@ jobs:
       id: check-versions
       shell: pwsh
       run: |
-        ./check-workload-updates.ps1 -DockerRepository "${{ env.DOCKER_REPOSITORY_RUNNER }}"
+        ./check-workload-updates.ps1 -DockerRepository "${{ env.DOCKER_REPOSITORY_RUNNER }}" -TestDockerRepository "${{ env.DOCKER_REPOSITORY_TEST }}" -BaseDockerRepository "${{ env.DOCKER_REPOSITORY_BASE }}"
+
+  trigger-base-build:
+    name: 🚀 Trigger Base Build
+    needs: check-updates
+    if: needs.check-updates.outputs.trigger-builds == 'true'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 🚀 Trigger Build Base Workflow
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const workloadVersion = '${{ needs.check-updates.outputs.workload-set-version }}';
+          
+          console.log(`Triggering build-base workflow for workload set version: ${workloadVersion}`);
+          
+          await github.rest.actions.createWorkflowDispatch({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            workflow_id: 'build-base.yml',
+            ref: 'main',
+            inputs: {
+              workload_set_version: workloadVersion
+            }
+          });
 
   trigger-runner-build:
     name: 🚀 Trigger Runner Build
-    needs: check-updates
+    needs: [check-updates, trigger-base-build]
     if: needs.check-updates.outputs.trigger-builds == 'true'
     runs-on: ubuntu-latest
     
@@ -59,7 +89,7 @@ jobs:
 
   trigger-test-build:
     name: 🚀 Trigger Test Build
-    needs: check-updates
+    needs: [check-updates, trigger-base-build]
     if: needs.check-updates.outputs.trigger-builds == 'true'
     runs-on: ubuntu-latest
     
@@ -85,7 +115,7 @@ jobs:
 
   notify-results:
     name: 📢 Notify Results
-    needs: [check-updates, trigger-runner-build, trigger-test-build]
+    needs: [check-updates, trigger-base-build, trigger-runner-build, trigger-test-build]
     if: always()
     runs-on: ubuntu-latest
     
@@ -101,10 +131,12 @@ jobs:
         echo "- **Builds triggered:** ${{ needs.check-updates.outputs.trigger-builds }}" >> $GITHUB_STEP_SUMMARY
         
         if [[ "${{ needs.check-updates.outputs.trigger-builds }}" == "true" ]]; then
+          echo "- **Base build status:** ${{ needs.trigger-base-build.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Runner build status:** ${{ needs.trigger-runner-build.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Test build status:** ${{ needs.trigger-test-build.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "✅ New workload set version detected!" >> $GITHUB_STEP_SUMMARY
+          echo "   - Base images built with new workload set version" >> $GITHUB_STEP_SUMMARY
           echo "   - Runner builds triggered with new workload set version" >> $GITHUB_STEP_SUMMARY
           echo "   - Test builds triggered with workload-based Android SDK dependencies" >> $GITHUB_STEP_SUMMARY
         else

@@ -30,7 +30,7 @@ These base images can be used as the foundation for:
 ### Example Dockerfile using the base image:
 
 ```dockerfile
-FROM redth/maui-docker-base:linux-latest
+FROM redth/maui-build:linux-latest
 
 # Add your custom requirements here
 COPY your-app /app
@@ -47,21 +47,21 @@ CMD ["dotnet", "run"]
 
 ### Linux:
 ```powershell
-./linux/build.ps1 -DockerRepository "your-repo/maui-docker-base" -Version "your-tag"
+./linux/build.ps1 -DockerRepository "your-repo/maui-build" -Version "your-tag"
 ```
 
 ### Windows:
 ```powershell
-./windows/build.ps1 -DockerRepository "your-repo/maui-docker-base" -Version "your-tag"
+./windows/build.ps1 -DockerRepository "your-repo/maui-build" -Version "your-tag"
 ```
 
 ### Both platforms:
 ```powershell
 # Build Linux
-./base-build.ps1 -DockerPlatform "linux/amd64" -DockerRepository "your-repo/maui-docker-base"
+./base-build.ps1 -DockerPlatform "linux/amd64" -DockerRepository "your-repo/maui-build"
 
 # Build Windows  
-./base-build.ps1 -DockerPlatform "windows/amd64" -DockerRepository "your-repo/maui-docker-base"
+./base-build.ps1 -DockerPlatform "windows/amd64" -DockerRepository "your-repo/maui-build"
 ```
 
 ## Relationship to Runner Images

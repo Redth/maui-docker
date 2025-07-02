@@ -11,20 +11,20 @@ This repository provides three types of Docker images for .NET MAUI development:
 
 Base images provide a complete .NET MAUI development environment without the GitHub Actions runner. These are perfect for general development containers, custom CI/CD setups, or as foundation images for other specialized containers.
 
-- Linux: ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-docker-base/linux-latest?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-docker-base%2Ftags)
-- Windows: ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-docker-base/windows-latest?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-docker-base%2Ftags)
+- Linux: ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-build/linux-latest?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-build%2Ftags)
+- Windows: ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-build/windows-latest?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-build%2Ftags)
 
 ### Usage:
 
 ```pwsh
 # Run a Linux development container
-docker run -it redth/maui-docker-base:linux-latest bash
+docker run -it redth/maui-build:linux-latest bash
 
 # Run a Windows development container  
-docker run -it redth/maui-docker-base:windows-latest powershell
+docker run -it redth/maui-build:windows-latest powershell
 
 # Use as base image
-FROM redth/maui-docker-base:linux-latest
+FROM redth/maui-build:linux-latest
 # Add your custom requirements here
 ```
 
