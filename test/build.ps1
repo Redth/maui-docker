@@ -4,7 +4,8 @@ Param(
     [String]$AndroidSdkApiLevel=35,
     [String]$Version="latest",
     [String]$MauiVersionPropsCommit="b2b2191462463e5239184b0a47ec0d0fe2d07e7d",
-    [Bool]$Load=$false) 
+    [Bool]$Load=$false,
+    [Bool]$Push=$false) 
 
 if ($DockerPlatform.StartsWith('linux/')) {
     $dockerTagBase = "appium-emulator-linux"
