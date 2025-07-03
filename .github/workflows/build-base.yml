@@ -48,21 +48,17 @@ jobs:
       shell: pwsh
       working-directory: ./base/linux/
       run: |
-        $Push = $false
-        if ("${{ github.ref }}" -eq "refs/heads/main") {
-          $Push = $true
-        }
-        
         # Build arguments
         $buildArgs = @(
-          "-DotNetVersion", "${{ matrix.DOTNET_VERSION }}"
-          "-Version", "${{ github.run_id }}"
-          "-DockerRepository", "${{ env.DOCKER_REPOSITORY }}"
-          "-DockerPlatform", "linux/amd64"
-          "-Load", $true
-          "-Push", $Push
+          "-DotNetVersion", "${{ matrix.DOTNET_VERSION }}",
+          "-Version", "${{ github.run_id }}",
+          "-DockerRepository", "${{ env.DOCKER_REPOSITORY }}",
+          "-DockerPlatform", "linux/amd64",
+          "-Load"
         )
-        
+        if ("${{ github.ref }}" -eq "refs/heads/main") {
+          $buildArgs += "-Push"
+        }
         # Add workload set version if specified
         if ("${{ steps.vars.outputs.workload_set_version }}" -ne "") {
           $buildArgs += "-WorkloadSetVersion", "${{ steps.vars.outputs.workload_set_version }}"
@@ -104,20 +100,18 @@ jobs:
       shell: pwsh
       working-directory: ./base/windows/
       run: |
-        $Push = $false
-        if ("${{ github.ref }}" -eq "refs/heads/main") {
-          $Push = $true
-        }
-        
         # Build arguments
         $buildArgs = @(
-          "-DotNetVersion", "${{ matrix.DOTNET_VERSION }}"
-          "-Version", "${{ github.run_id }}"
-          "-DockerRepository", "${{ env.DOCKER_REPOSITORY }}"
-          "-DockerPlatform", "windows/amd64"
-          "-Load", $true
-          "-Push", $Push
+          "-DotNetVersion", "${{ matrix.DOTNET_VERSION }}",
+          "-Version", "${{ github.run_id }}",
+          "-DockerRepository", "${{ env.DOCKER_REPOSITORY }}",
+          "-DockerPlatform", "windows/amd64",
+          "-Load"
         )
+        
+        if ("${{ github.ref }}" -eq "refs/heads/main") {
+          $buildArgs += "-Push"
+        }
         
         # Add workload set version if specified
         if ("${{ steps.vars.outputs.workload_set_version }}" -ne "") {

@@ -173,20 +173,17 @@ jobs:
       shell: pwsh
       working-directory: ./test/
       run: |
-        # Only push images on main branch
-        $Push = $false
-        if ("${{ github.ref }}" -eq "refs/heads/main") {
-          $Push = $true
-        }
-        
         # Build arguments
         $buildArgs = @(
-          "-AndroidSdkApiLevel", "${{ matrix.android_api_level }}"
-          "-DockerRepository", "${{ env.DOCKER_REPOSITORY }}"
-          "-Version", "${{ github.run_id }}"
-          "-Load", $true
-          "-Push", $Push
+          "-AndroidSdkApiLevel", "${{ matrix.android_api_level }}",
+          "-DockerRepository", "${{ env.DOCKER_REPOSITORY }}",
+          "-Version", "${{ github.run_id }}",
+          "-Load"
         )
+        
+        if ("${{ github.ref }}" -eq "refs/heads/main") {
+          $buildArgs += "-Push"
+        }
         
         # Add workload set version if specified
         if ("${{ needs.get-workload-info.outputs.workload-set-version }}" -ne "") {

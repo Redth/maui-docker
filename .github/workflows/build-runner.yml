@@ -48,19 +48,17 @@ jobs:
       shell: pwsh
       working-directory: ./runner/windows/
       run: |
-        $Push = $false
-        if ("${{ github.ref }}" -eq "refs/heads/main") {
-          $Push = $true
-        }
-        
         # Build arguments
         $buildArgs = @(
-          "-DotNetVersion", "${{ matrix.DOTNET_VERSION }}"
-          "-Version", "${{ github.run_id }}"
-          "-DockerRepository", "${{ env.DOCKER_REPOSITORY }}"
-          "-Load", $true
-          "-Push", $Push
+          "-DotNetVersion", "${{ matrix.DOTNET_VERSION }}",
+          "-Version", "${{ github.run_id }}",
+          "-DockerRepository", "${{ env.DOCKER_REPOSITORY }}",
+          "-Load"
         )
+        
+        if ("${{ github.ref }}" -eq "refs/heads/main") {
+          $buildArgs += "-Push"
+        }
         
         # Add workload set version if specified
         if ("${{ steps.vars.outputs.workload_set_version }}" -ne "") {
@@ -105,19 +103,18 @@ jobs:
       shell: pwsh
       working-directory: ./runner/linux/
       run: |
-        $Push = $false
-        if ("${{ github.ref }}" -eq "refs/heads/main") {
-          $Push = $true
-        }
         
         # Build arguments
         $buildArgs = @(
-          "-DotNetVersion", "${{ matrix.DOTNET_VERSION }}"
-          "-Version", "${{ github.run_id }}"
-          "-DockerRepository", "${{ env.DOCKER_REPOSITORY }}"
-          "-Load", $true
-          "-Push", $Push
+          "-DotNetVersion", "${{ matrix.DOTNET_VERSION }}",
+          "-Version", "${{ github.run_id }}",
+          "-DockerRepository", "${{ env.DOCKER_REPOSITORY }}",
+          "-Load"
         )
+        
+        if ("${{ github.ref }}" -eq "refs/heads/main") {
+          $buildArgs += "-Push"
+        }
         
         # Add workload set version if specified
         if ("${{ steps.vars.outputs.workload_set_version }}" -ne "") {
