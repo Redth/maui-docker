@@ -57,7 +57,7 @@ jobs:
           Load              = $true
         }
         if ("${{ github.ref }}" -eq "refs/heads/main") {
-          $buildArgs.Push = $t
+          $buildArgs.Push = $true
         }
         # Add workload set version if specified
         if ("${{ steps.vars.outputs.workload_set_version }}" -ne "") {
