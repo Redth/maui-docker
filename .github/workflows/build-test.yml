@@ -64,8 +64,9 @@ jobs:
         . ./common-functions.ps1
         
         # Define .NET versions to check
-        $dotnetVersions = if ("${{ inputs.dotnet_versions }}" -ne "") {
-          '${{ inputs.dotnet_versions }}' | ConvertFrom-Json
+        $dotnetVersionsInput = '${{ inputs.dotnet_versions }}'
+        $dotnetVersions = if ($dotnetVersionsInput -ne "") {
+          $dotnetVersionsInput | ConvertFrom-Json
         } else {
           @("9.0", "10.0")
         }
@@ -97,15 +98,17 @@ jobs:
         $workloadApiLevels = '${{ steps.get-workload-info.outputs.workload-api-levels }}' | ConvertFrom-Json
         
         # Define .NET versions to use
-        $dotnetVersions = if ("${{ inputs.dotnet_versions }}" -ne "") {
-          '${{ inputs.dotnet_versions }}' | ConvertFrom-Json
+        $dotnetVersionsInput = '${{ inputs.dotnet_versions }}'
+        $dotnetVersions = if ($dotnetVersionsInput -ne "") {
+          $dotnetVersionsInput | ConvertFrom-Json
         } else {
           @("9.0", "10.0")
         }
         
         # Define API levels to use
-        $apiLevels = if ("${{ inputs.android_api_levels }}" -ne "") {
-          '${{ inputs.android_api_levels }}' | ConvertFrom-Json
+        $apiLevelsInput = '${{ inputs.android_api_levels }}'
+        $apiLevels = if ($apiLevelsInput -ne "") {
+          $apiLevelsInput | ConvertFrom-Json
         } else {
           @(23, 24, 25, 26, 28, 29, 30, 31, 32, 33, 34, 35)
         }
