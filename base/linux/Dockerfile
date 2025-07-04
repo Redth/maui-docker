@@ -79,7 +79,7 @@ RUN ubuntu_release=$(lsb_release -rs) \
     && rm -rf /var/lib/apt/lists/*
 
 # Install the Workloads
-RUN dotnet workload install maui-android --version ${DOTNET_WORKLOADS_VERSION}
+RUN dotnet workload install maui-android wasm-tools --version ${DOTNET_WORKLOADS_VERSION}
 
 # Fix permissions on the log directory
 RUN chown -R 1400:1401 ${LOG_PATH}
