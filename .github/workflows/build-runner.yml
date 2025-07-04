@@ -49,20 +49,20 @@ jobs:
       working-directory: ./runner/windows/
       run: |
         # Build arguments
-        $buildArgs = @(
-          "-DotNetVersion", "${{ matrix.DOTNET_VERSION }}",
-          "-Version", "${{ github.run_id }}",
-          "-DockerRepository", "${{ env.DOCKER_REPOSITORY }}",
-          "-Load", $true
-        )
+        $buildArgs = @{
+          DotNetVersion     = "${{ matrix.DOTNET_VERSION }}"
+          Version           = "${{ github.run_id }}"
+          DockerRepository  = "${{ env.DOCKER_REPOSITORY }}"
+          Load              = $true
+        }
         
         if ("${{ github.ref }}" -eq "refs/heads/main") {
-          $buildArgs += "-Push", $true
+          $buildArgs.Push = $true
         }
         
         # Add workload set version if specified
         if ("${{ steps.vars.outputs.workload_set_version }}" -ne "") {
-          $buildArgs += "-WorkloadSetVersion", "${{ steps.vars.outputs.workload_set_version }}"
+          $buildArgs.WorkloadSetVersion = "${{ steps.vars.outputs.workload_set_version }}"
         }
         
         ./build.ps1 @buildArgs
@@ -105,20 +105,20 @@ jobs:
       run: |
         
         # Build arguments
-        $buildArgs = @(
-          "-DotNetVersion", "${{ matrix.DOTNET_VERSION }}",
-          "-Version", "${{ github.run_id }}",
-          "-DockerRepository", "${{ env.DOCKER_REPOSITORY }}",
-          "-Load", $true
-        )
+        $buildArgs = @{
+          DotNetVersion     = "${{ matrix.DOTNET_VERSION }}"
+          Version           = "${{ github.run_id }}"
+          DockerRepository  = "${{ env.DOCKER_REPOSITORY }}"
+          Load              = $true
+        }
         
         if ("${{ github.ref }}" -eq "refs/heads/main") {
-          $buildArgs += "-Push", $true
+          $buildArgs.Push = $true
         }
         
         # Add workload set version if specified
         if ("${{ steps.vars.outputs.workload_set_version }}" -ne "") {
-          $buildArgs += "-WorkloadSetVersion", "${{ steps.vars.outputs.workload_set_version }}"
+          $buildArgs.WorkloadSetVersion = "${{ steps.vars.outputs.workload_set_version }}"
         }
         
         ./build.ps1 @buildArgs

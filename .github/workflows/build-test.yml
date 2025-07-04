@@ -174,32 +174,32 @@ jobs:
       working-directory: ./test/
       run: |
         # Build arguments
-        $buildArgs = @(
-          "-AndroidSdkApiLevel", "${{ matrix.android_api_level }}",
-          "-DockerRepository", "${{ env.DOCKER_REPOSITORY }}",
-          "-Version", "${{ github.run_id }}",
-          "-Load", $true
-        )
-        
+        $buildArgs = @{
+          AndroidSdkApiLevel  = "${{ matrix.android_api_level }}"
+          DockerRepository    = "${{ env.DOCKER_REPOSITORY }}"
+          Version             = "${{ github.run_id }}"
+          Load                = $true
+        }
+
         if ("${{ github.ref }}" -eq "refs/heads/main") {
-          $buildArgs += "-Push", $true
+          $buildArgs.Push = $true
         }
         
         # Add workload set version if specified
         if ("${{ needs.get-workload-info.outputs.workload-set-version }}" -ne "") {
-          $buildArgs += "-WorkloadSetVersion", "${{ needs.get-workload-info.outputs.workload-set-version }}"
+          $buildArgs.WorkloadSetVersion = "${{ needs.get-workload-info.outputs.workload-set-version }}"
         }
         
         # Add .NET version from matrix
-        $buildArgs += "-DotnetVersion", "${{ matrix.dotnet_version }}"
-        
+        $buildArgs.DotnetVersion = "${{ matrix.dotnet_version }}"
+
         # Add Appium versions if specified
         if ("${{ inputs.appium_version }}" -ne "") {
-          $buildArgs += "-AppiumVersion", "${{ inputs.appium_version }}"
+          $buildArgs.AppiumVersion = "${{ inputs.appium_version }}"
         }
         
         if ("${{ inputs.appium_uiautomator2_driver_version }}" -ne "") {
-          $buildArgs += "-AppiumUIAutomator2DriverVersion", "${{ inputs.appium_uiautomator2_driver_version }}"
+          $buildArgs.AppiumUIAutomator2DriverVersion = "${{ inputs.appium_uiautomator2_driver_version }}"
         }
         
         ./build.ps1 @buildArgs
