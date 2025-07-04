@@ -54,10 +54,10 @@ jobs:
           "-Version", "${{ github.run_id }}",
           "-DockerRepository", "${{ env.DOCKER_REPOSITORY }}",
           "-DockerPlatform", "linux/amd64",
-          "-Load"
+          "-Load", $true
         )
         if ("${{ github.ref }}" -eq "refs/heads/main") {
-          $buildArgs += "-Push"
+          $buildArgs += "-Push", $true
         }
         # Add workload set version if specified
         if ("${{ steps.vars.outputs.workload_set_version }}" -ne "") {
@@ -106,11 +106,11 @@ jobs:
           "-Version", "${{ github.run_id }}",
           "-DockerRepository", "${{ env.DOCKER_REPOSITORY }}",
           "-DockerPlatform", "windows/amd64",
-          "-Load"
+          "-Load", $true
         )
         
         if ("${{ github.ref }}" -eq "refs/heads/main") {
-          $buildArgs += "-Push"
+          $buildArgs += "-Push", $true
         }
         
         # Add workload set version if specified

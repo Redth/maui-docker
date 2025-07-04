@@ -53,11 +53,11 @@ jobs:
           "-DotNetVersion", "${{ matrix.DOTNET_VERSION }}",
           "-Version", "${{ github.run_id }}",
           "-DockerRepository", "${{ env.DOCKER_REPOSITORY }}",
-          "-Load"
+          "-Load", $true
         )
         
         if ("${{ github.ref }}" -eq "refs/heads/main") {
-          $buildArgs += "-Push"
+          $buildArgs += "-Push", $true
         }
         
         # Add workload set version if specified
@@ -109,11 +109,11 @@ jobs:
           "-DotNetVersion", "${{ matrix.DOTNET_VERSION }}",
           "-Version", "${{ github.run_id }}",
           "-DockerRepository", "${{ env.DOCKER_REPOSITORY }}",
-          "-Load"
+          "-Load", $true
         )
         
         if ("${{ github.ref }}" -eq "refs/heads/main") {
-          $buildArgs += "-Push"
+          $buildArgs += "-Push", $true
         }
         
         # Add workload set version if specified
