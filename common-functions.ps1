@@ -8,8 +8,14 @@ function Find-LatestWorkloadSet {
     
     Write-Host "Finding latest workload set for .NET $DotnetVersion..."
     
+    # Extract major version (e.g., "9.0" from "9.0.100")
+    $majorVersion = $DotnetVersion
+    if ($DotnetVersion -match '^(\d+\.\d+)') {
+        $majorVersion = $Matches[1]
+    }
+    
     # Search for workload set packages using the official NuGet API
-    $searchPattern = "Microsoft.NET.Workloads.$DotnetVersion"
+    $searchPattern = "Microsoft.NET.Workloads.$majorVersion"
     
     try {
         # First, get the NuGet service index
@@ -38,12 +44,12 @@ function Find-LatestWorkloadSet {
     # Filter to match only exact SDK band versions (e.g., Microsoft.NET.Workloads.9.0.100)
     # This excludes architecture-specific packages with suffixes like .Msi.x86
     $workloadSets = $response.data | Where-Object { 
-        # Match exact pattern: Microsoft\.NET\.Workloads\.$DotnetVersion\.\d+$
-        $_.id -match "^Microsoft\.NET\.Workloads\.$DotnetVersion\.\d+$"
+        # Match exact pattern: Microsoft\.NET\.Workloads\.$majorVersion\.\d+$
+        $_.id -match "^Microsoft\.NET\.Workloads\.$majorVersion\.\d+$"
     }
     
     if (-not $workloadSets) {
-        Write-Error "No workload sets found for .NET $DotnetVersion"
+        Write-Error "No workload sets found for .NET $majorVersion"
         return $null
     }
     
@@ -62,7 +68,7 @@ function Find-LatestWorkloadSet {
     # Find the highest version band by parsing the band number
     $highestBand = $versionBands.Keys | ForEach-Object {
         # Extract the band part (e.g., "100" from "9.0.100")
-        if ($_ -match "$DotnetVersion\.(\d+)$") {
+        if ($_ -match "$majorVersion\.(\d+)$") {
             [PSCustomObject]@{
                 FullBand = $_
                 BandNumber = [int]$Matches[1]

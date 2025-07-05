@@ -90,7 +90,7 @@ jobs:
         echo "workload_set_version=$env:WORKLOAD_SET_VERSION" >> $env:GITHUB_OUTPUT
         Write-Host "Using workload set version: $env:WORKLOAD_SET_VERSION"
 
-    - name: �🐋 DockerHub
+    - name: 🐋 DockerHub
       uses: docker/login-action@v3
       with:
         username: ${{ secrets.DOCKER_USERNAME }}
