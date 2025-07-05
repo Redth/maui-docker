@@ -3,10 +3,14 @@
 # Function to find the latest workload set version
 function Find-LatestWorkloadSet {
     param (
-        [string]$DotnetVersion
+        [string]$DotnetVersion,
+        [string]$WorkloadSetVersion = ""
     )
     
     Write-Host "Finding latest workload set for .NET $DotnetVersion..."
+    if ($WorkloadSetVersion) {
+        Write-Host "Looking for specific workload set version: $WorkloadSetVersion"
+    }
     
     # Extract major version (e.g., "9.0" from "9.0.100")
     $majorVersion = $DotnetVersion
@@ -48,6 +52,25 @@ function Find-LatestWorkloadSet {
         $_.id -match "^Microsoft\.NET\.Workloads\.$majorVersion\.\d+$"
     }
     
+    # If a specific WorkloadSetVersion is provided, filter to only that version
+    if ($WorkloadSetVersion) {
+        $workloadSets = $workloadSets | Where-Object { $_.version -eq $WorkloadSetVersion }
+        if (-not $workloadSets) {
+            Write-Error "No workload set found for .NET $majorVersion with version $WorkloadSetVersion"
+            return $null
+        }
+        # If we found a specific version, return it directly
+        if ($workloadSets.Count -eq 1) {
+            $foundWorkloadSet = $workloadSets[0]
+            Write-Host "Found specific workload set: $($foundWorkloadSet.id) v$($foundWorkloadSet.version)"
+            Write-Host "DEBUG: Package ID that will be used: $($foundWorkloadSet.id)"
+            return $foundWorkloadSet
+        } elseif ($workloadSets.Count -gt 1) {
+            # Multiple workload sets with the same version (different bands), pick the highest band
+            Write-Host "Found multiple workload sets with version $WorkloadSetVersion, selecting highest band..."
+        }
+    }
+    
     if (-not $workloadSets) {
         Write-Error "No workload sets found for .NET $majorVersion"
         return $null
@@ -79,6 +102,7 @@ function Find-LatestWorkloadSet {
     if ($highestBand) {
         $latestWorkloadSet = $versionBands[$highestBand]
         Write-Host "Found latest workload set: $($latestWorkloadSet.id) v$($latestWorkloadSet.version)"
+        Write-Host "DEBUG: Package ID that will be used: $($latestWorkloadSet.id)"
         return $latestWorkloadSet
     }
     
@@ -116,6 +140,7 @@ function Get-NuGetPackageContent {
         
         # Check if the requested file exists
         $targetFile = Join-Path $extractPath $FilePath
+        Write-Host "Looking for file: $targetFile"
         if (Test-Path $targetFile) {
             $content = Get-Content -Path $targetFile -Raw
             return $content
@@ -356,20 +381,33 @@ function Get-WorkloadSetInfo {
         [string[]]$WorkloadNames = @("Microsoft.NET.Sdk.Android")
     )
     
+    # Extract major version (e.g., "9.0" from "9.0.100") for package ID construction
+    $majorVersion = $DotnetVersion
+    if ($DotnetVersion -match '^(\d+\.\d+)') {
+        $majorVersion = $Matches[1]
+    }
+    
     # Find the latest workload set if not specified
     if (-not $WorkloadSetVersion) {
-        $latestWorkloadSet = Find-LatestWorkloadSet -DotnetVersion $DotnetVersion
+        $latestWorkloadSet = Find-LatestWorkloadSet -DotnetVersion $majorVersion
         if ($latestWorkloadSet) {
             $WorkloadSetVersion = $latestWorkloadSet.version
-            $WorkloadSetId = $latestWorkloadSet.id
+            $WorkloadSetId = $latestWorkloadSet.id  # Use the actual package ID from search results
             Write-Host "Using workload set: $WorkloadSetId v$WorkloadSetVersion"
         } else {
             Write-Error "Failed to find a valid workload set. Please specify WorkloadSetVersion manually."
             return $null
         }
     } else {
-        $WorkloadSetId = "Microsoft.NET.Workloads.$DotnetVersion"
-        Write-Host "Using specified workload set: $WorkloadSetId v$WorkloadSetVersion"
+        # Find the workload set with the specified version
+        $specificWorkloadSet = Find-LatestWorkloadSet -DotnetVersion $majorVersion -WorkloadSetVersion $WorkloadSetVersion
+        if ($specificWorkloadSet) {
+            $WorkloadSetId = $specificWorkloadSet.id  # Use the actual package ID from search results
+            Write-Host "Using specified workload set: $WorkloadSetId v$WorkloadSetVersion"
+        } else {
+            Write-Error "Failed to find workload set with version $WorkloadSetVersion for .NET $majorVersion"
+            return $null
+        }
     }
 
     # Convert the WorkloadSetVersion to the format expected by dotnet workload CLI commands
@@ -579,3 +617,5 @@ function Get-LatestAppiumVersions {
         UIAutomator2DriverVersion = $uiAutomator2Version
     }
 }
+
+#Get-NuGetPackageContent -PackageId 'Microsoft.NET.Workloads.9.0.300' -Version '9.301.1' -FilePath 'data/WorkloadManifest.json' 
