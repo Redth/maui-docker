@@ -42,8 +42,9 @@ RUN choco install microsoft-openjdk$($env:JDK_MAJOR_VERSION) -y
 # Install the Workloads
 RUN dotnet workload install maui --version $env:DOTNET_WORKLOADS_VERSION
 
-# Install Android SDK Tool
+# Install Android SDK Tool & AppleDev Tool
 RUN dotnet tool install -g AndroidSdk.Tool
+RUN dotnet tool install -g AppleDev.Tools
 
 # Install and configure Android SDK
 RUN android sdk download --home="$env:ANDROID_HOME"

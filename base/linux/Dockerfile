@@ -87,8 +87,9 @@ RUN chown -R 1400:1401 ${LOG_PATH}
 # Switch to mauiusr
 USER 1400:1401
 
-# Install Android SDK Tool
+# Install Android SDK Tool & AppleDev Tool
 RUN dotnet tool install -g AndroidSdk.Tool
+RUN dotnet tool install -g AppleDev.Tools
 
 ENV PATH="/home/mauiusr/.dotnet/tools:${PATH}"
 
