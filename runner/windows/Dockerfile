@@ -38,7 +38,7 @@ RUN $zipFile = $PWD.Path + '\\actions-runner-windows.zip' ; \
     Remove-Item -Path $zipFile -Force
 
 # Copy the Supervisor configuration file for running the emulator and Appium
-COPY windows/scripts/runner.ps1 C:/actions-runner/runner.ps1
+COPY scripts/runner.ps1 C:/actions-runner/runner.ps1
 
 # Default command
 CMD ["powershell", "C:\\actions-runner\\runner.ps1"]

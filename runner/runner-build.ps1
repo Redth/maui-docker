@@ -135,19 +135,29 @@ if ($DockerPlatform.StartsWith('linux/')) {
 
 if ($DockerPlatform.StartsWith('linux/')) {
     $buildxArgs += "-f"
-    $buildxArgs += "$PSScriptRoot/linux/Dockerfile"
+    $buildxArgs += "Dockerfile"
+    $buildContext = "$PSScriptRoot/linux"
 } else {
     $buildxArgs += "-f"
-    $buildxArgs += "$PSScriptRoot/windows/Dockerfile"
+    $buildxArgs += "Dockerfile"
+    $buildContext = "$PSScriptRoot/windows"
 }
 
 $buildxArgs += "."
 
-# Execute the docker command with all arguments
-& docker $buildxArgs
+# Change to the platform-specific directory for the build context
+Push-Location $buildContext
 
-# Output information for debugging
-Write-Host "Docker buildx command completed with exit code: $LASTEXITCODE"
+try {
+    # Execute the docker command with all arguments
+    & docker $buildxArgs
+
+    # Output information for debugging
+    Write-Host "Docker buildx command completed with exit code: $LASTEXITCODE"
+} finally {
+    # Always return to original directory
+    Pop-Location
+}
 
 
 if ($Push) {
