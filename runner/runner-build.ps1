@@ -60,7 +60,7 @@ Write-Host "Base Image Tag: $dotnetCommandWorkloadSetVersion"
 Write-Host "Docker Repository: $DockerRepository"
 Write-Host "Docker Platform: $DockerPlatform"
 Write-Host ""
-Write-Host "NOTE: This build assumes the base image '$BaseDockerRepository`:$dockerTagBase-$dotnetCommandWorkloadSetVersion' exists."
+Write-Host "NOTE: This build assumes the base image '$BaseDockerRepository`:$dockerTagBase-dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion' exists."
 Write-Host "If it doesn't exist, build it first with: ../base/base-build.ps1 -DotnetVersion $DotnetVersion -DockerPlatform $DockerPlatform"
 Write-Host ""
 
@@ -69,7 +69,7 @@ if ($BuildBase) {
     Write-Host "Building base image first..."
     $baseBuildScript = Join-Path -Path $PSScriptRoot -ChildPath "..\base\base-build.ps1"
     if (Test-Path $baseBuildScript) {
-        & $baseBuildScript -DotnetVersion $DotnetVersion -DockerRepository $BaseDockerRepository -DockerPlatform $DockerPlatform -Version $dotnetCommandWorkloadSetVersion -Load:$Load
+        & $baseBuildScript -DotnetVersion $DotnetVersion -WorkloadSetVersion $WorkloadSetVersion -DockerRepository $BaseDockerRepository -DockerPlatform $DockerPlatform -Version $Version -Load:$Load
         if ($LASTEXITCODE -ne 0) {
             Write-Error "Base image build failed with exit code $LASTEXITCODE"
             exit $LASTEXITCODE
@@ -109,7 +109,7 @@ if ($DockerPlatform.StartsWith('linux/')) {
     $buildxArgs = @(
         "buildx", "build",
         "--platform", $DockerPlatform,
-        "--build-arg", "BASE_IMAGE_TAG=$dotnetCommandWorkloadSetVersion",
+        "--build-arg", "BASE_IMAGE_TAG=dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion",
         "--build-arg", "BASE_DOCKER_REPOSITORY=$BaseDockerRepository",
         "--build-arg", "GITHUB_ACTIONS_RUNNER_VERSION=2.323.0",
         "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion",
@@ -123,7 +123,7 @@ if ($DockerPlatform.StartsWith('linux/')) {
 } else {
     $buildxArgs = @(
         "build",
-        "--build-arg", "BASE_IMAGE_TAG=$dotnetCommandWorkloadSetVersion",
+        "--build-arg", "BASE_IMAGE_TAG=dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion",
         "--build-arg", "BASE_DOCKER_REPOSITORY=$BaseDockerRepository",
         "--build-arg", "GITHUB_ACTIONS_RUNNER_VERSION=2.323.0",
         "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion",
