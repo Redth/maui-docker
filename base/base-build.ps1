@@ -53,11 +53,12 @@ $dotnetCommandWorkloadSetVersion = $workloadInfo.DotnetCommandWorkloadSetVersion
 Write-Host "Building MAUI Base Image for $DockerPlatform"
 Write-Host "=============================================="
 Write-Host ".NET Version: $DotnetVersion"
-Write-Host "Workload Set Version: $($workloadInfo.ResolvedWorkloadSetVersion)"
+Write-Host "Workload Set Version: $($workloadInfo.WorkloadSetVersion)"
 Write-Host "Dotnet Command Workload Set Version: $dotnetCommandWorkloadSetVersion"
-Write-Host "Android SDK API Level: $($androidDetails.AndroidSdkApiLevel)"
-Write-Host "Android SDK Build Tools Version: $($androidDetails.AndroidSdkBuildToolsVersion)"
-Write-Host "Android SDK Command Line Tools Version: $($androidDetails.AndroidSdkCommandLineToolsVersion)"
+Write-Host "Android SDK API Level: $($androidDetails.ApiLevel)"
+Write-Host "Android SDK Build Tools Version: $($androidDetails.BuildToolsVersion)"
+Write-Host "Android SDK Command Line Tools Version: $($androidDetails.CmdLineToolsVersion)"
+Write-Host "JDK Major Version: $($androidDetails.JdkMajorVersion)"
 Write-Host "JDK Major Version: $($androidDetails.JdkMajorVersion)"
 Write-Host "Docker Repository: $DockerRepository"
 Write-Host "Docker Platform: $DockerPlatform"
@@ -89,9 +90,9 @@ Write-Host "  Versioned: $versionedTag"
 $buildArgs = @(
     "--build-arg", "DOTNET_VERSION=$DotnetVersion",
     "--build-arg", "JDK_MAJOR_VERSION=$($androidDetails.JdkMajorVersion)",
-    "--build-arg", "ANDROID_SDK_API_LEVEL=$($androidDetails.AndroidSdkApiLevel)", 
-    "--build-arg", "ANDROID_SDK_BUILD_TOOLS_VERSION=$($androidDetails.AndroidSdkBuildToolsVersion)",
-    "--build-arg", "ANDROID_SDK_CMDLINE_TOOLS_VERSION=$($androidDetails.AndroidSdkCommandLineToolsVersion)",
+    "--build-arg", "ANDROID_SDK_API_LEVEL=$($androidDetails.ApiLevel)", 
+    "--build-arg", "ANDROID_SDK_BUILD_TOOLS_VERSION=$($androidDetails.BuildToolsVersion)",
+    "--build-arg", "ANDROID_SDK_CMDLINE_TOOLS_VERSION=$($androidDetails.CmdLineToolsVersion)",
     "--build-arg", "DOTNET_WORKLOADS_VERSION=$dotnetCommandWorkloadSetVersion",
     "--platform", $DockerPlatform,
     "--tag", $primaryTag,
