@@ -26,8 +26,8 @@ ENV EPHEMERAL=""
 USER root
 
 # Copy the Supervisor configuration file for running the actions runner
-COPY scripts/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-COPY scripts/runner.sh /home/mauiusr/runner.sh
+COPY linux/scripts/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY linux/scripts/runner.sh /home/mauiusr/runner.sh
 
 # Make runner script executable and fix ownership
 RUN chmod +x /home/mauiusr/runner.sh && chown 1400:1401 /home/mauiusr/runner.sh
