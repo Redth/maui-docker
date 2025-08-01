@@ -13,5 +13,4 @@ $buildPath = Join-Path -Path $PSScriptRoot -ChildPath "..\base-build.ps1" -Resol
     -DockerRepository $DockerRepository `
     -DockerPlatform "windows/amd64" `
     -Version $Version `
-    -Load $Load `
     -Push $Push

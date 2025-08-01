@@ -50,77 +50,34 @@ jobs:
           ./check-workload-updates.ps1 -DockerRepository "${{ env.DOCKER_REPOSITORY_RUNNER }}" -TestDockerRepository "${{ env.DOCKER_REPOSITORY_TEST }}" -BaseDockerRepository "${{ env.DOCKER_REPOSITORY_BASE }}"
         }
 
-  trigger-base-build:
-    name: 🚀 Trigger Base Build
+  trigger-build-all:
+    name: 🚀 Trigger All Builds
     needs: check-updates
     if: needs.check-updates.outputs.trigger-builds == 'true'
     runs-on: ubuntu-latest
     
     steps:
-    - name: 🚀 Trigger Build Base Workflow
+    - name: 🚀 Trigger Build All Workflow
       uses: actions/github-script@v7
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
           const workloadVersion = '${{ needs.check-updates.outputs.workload-set-version }}';
           
-          console.log(`Triggering build-base workflow for workload set version: ${workloadVersion}`);
+          console.log(`Triggering build-all workflow for workload set version: ${workloadVersion}`);
           
           try {
             await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              workflow_id: 'build-base.yml',
+              workflow_id: 'build-all.yml',
               ref: 'main',
               inputs: {
-                workload_set_version: workloadVersion
-              }
-            });
-            console.log('✅ Successfully triggered build-base workflow');
-          } catch (error) {
-            console.log(`❌ Failed to trigger workflow: ${error.message}`);
-            console.log('🔄 Trying alternative approach with repository dispatch...');
-            
-            // Alternative: Use repository dispatch
-            await github.rest.repos.createDispatchEvent({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              event_type: 'trigger-base-build',
-              client_payload: {
                 workload_set_version: workloadVersion,
                 force_build: '${{ needs.check-updates.outputs.force-build }}'
               }
             });
-            console.log('✅ Successfully sent repository dispatch event');
-          }
-
-  trigger-runner-build:
-    name: 🚀 Trigger Runner Build
-    needs: [check-updates, trigger-base-build]
-    if: needs.check-updates.outputs.trigger-builds == 'true'
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: 🚀 Trigger Build Runner Workflow
-      uses: actions/github-script@v7
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        script: |
-          const workloadVersion = '${{ needs.check-updates.outputs.workload-set-version }}';
-          
-          console.log(`Triggering build-runner workflow for workload set version: ${workloadVersion}`);
-          
-          try {
-            await github.rest.actions.createWorkflowDispatch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'build-runner.yml',
-              ref: 'main',
-              inputs: {
-                workload_set_version: workloadVersion
-              }
-            });
-            console.log('✅ Successfully triggered build-runner workflow');
+            console.log('✅ Successfully triggered build-all workflow');
           } catch (error) {
             console.log(`❌ Failed to trigger workflow: ${error.message}`);
             console.log('🔄 Trying alternative approach with repository dispatch...');
@@ -129,51 +86,7 @@ jobs:
             await github.rest.repos.createDispatchEvent({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              event_type: 'trigger-runner-build',
-              client_payload: {
-                workload_set_version: workloadVersion,
-                force_build: '${{ needs.check-updates.outputs.force-build }}'
-              }
-            });
-            console.log('✅ Successfully sent repository dispatch event');
-          }
-
-  trigger-test-build:
-    name: 🚀 Trigger Test Build
-    needs: [check-updates, trigger-base-build]
-    if: needs.check-updates.outputs.trigger-builds == 'true'
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: 🚀 Trigger Build Test Workflow
-      uses: actions/github-script@v7
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        script: |
-          const workloadVersion = '${{ needs.check-updates.outputs.workload-set-version }}';
-          
-          console.log(`Triggering build-test workflow for workload set version: ${workloadVersion}`);
-          
-          try {
-            await github.rest.actions.createWorkflowDispatch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'build-test.yml',
-              ref: 'main',
-              inputs: {
-                workload_set_version: workloadVersion
-              }
-            });
-            console.log('✅ Successfully triggered build-test workflow');
-          } catch (error) {
-            console.log(`❌ Failed to trigger workflow: ${error.message}`);
-            console.log('🔄 Trying alternative approach with repository dispatch...');
-            
-            // Alternative: Use repository dispatch
-            await github.rest.repos.createDispatchEvent({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              event_type: 'trigger-test-build',
+              event_type: 'trigger-build-all',
               client_payload: {
                 workload_set_version: workloadVersion,
                 force_build: '${{ needs.check-updates.outputs.force-build }}'
@@ -184,7 +97,7 @@ jobs:
 
   notify-results:
     name: 📢 Notify Results
-    needs: [check-updates, trigger-base-build, trigger-runner-build, trigger-test-build]
+    needs: [check-updates, trigger-build-all]
     if: always()
     runs-on: ubuntu-latest
     
@@ -201,9 +114,7 @@ jobs:
         echo "- **Force build:** ${{ needs.check-updates.outputs.force-build }}" >> $GITHUB_STEP_SUMMARY
         
         if [[ "${{ needs.check-updates.outputs.trigger-builds }}" == "true" ]]; then
-          echo "- **Base build status:** ${{ needs.trigger-base-build.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Runner build status:** ${{ needs.trigger-runner-build.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Test build status:** ${{ needs.trigger-test-build.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build trigger status:** ${{ needs.trigger-build-all.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           if [[ "${{ needs.check-updates.outputs.force-build }}" == "true" ]]; then
@@ -213,9 +124,10 @@ jobs:
             echo "✅ New workload set version detected!" >> $GITHUB_STEP_SUMMARY
           fi
           
-          echo "   - Base images built with new workload set version" >> $GITHUB_STEP_SUMMARY
-          echo "   - Runner builds triggered with new workload set version" >> $GITHUB_STEP_SUMMARY
-          echo "   - Test builds triggered with workload-based Android SDK dependencies" >> $GITHUB_STEP_SUMMARY
+          echo "   - Combined build workflow triggered with proper dependency order:" >> $GITHUB_STEP_SUMMARY
+          echo "     1. Base images (Linux + Windows)" >> $GITHUB_STEP_SUMMARY
+          echo "     2. Runner images (depends on base)" >> $GITHUB_STEP_SUMMARY
+          echo "     3. Test images (depends on base)" >> $GITHUB_STEP_SUMMARY
         else
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "ℹ️ No new workload set version found. All builds are up to date." >> $GITHUB_STEP_SUMMARY
