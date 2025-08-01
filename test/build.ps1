@@ -117,6 +117,7 @@ Write-Host "  ${DockerRepository}:${dockerTagBase}-dotnet${DotnetVersion}-worklo
 $buildxArgs = @(
     "buildx", "build",
     "--platform", "linux/amd64", #"--platform", "linux/amd64,linux/arm64",
+    "-f", "Dockerfile",
     "--build-arg", "ANDROID_SDK_API_LEVEL=$AndroidSdkApiLevel",
     "--build-arg", "ANDROID_SDK_BUILD_TOOLS_VERSION=$androidBuildToolsVersion",
     "--build-arg", "ANDROID_SDK_CMDLINE_TOOLS_VERSION=$androidCmdLineToolsVersion",
@@ -142,11 +143,19 @@ if ($Load) {
 
 $buildxArgs += "."
 
-# Execute the docker command with all arguments
-& docker $buildxArgs
+# Change to the test directory to ensure correct build context
+Push-Location $PSScriptRoot
 
-# Output information for debugging
-Write-Host "Docker buildx command completed with exit code: $LASTEXITCODE"
+try {
+    # Execute the docker command with all arguments
+    & docker $buildxArgs
+
+    # Output information for debugging
+    Write-Host "Docker buildx command completed with exit code: $LASTEXITCODE"
+} finally {
+    # Always return to original directory
+    Pop-Location
+}
 
 
 
