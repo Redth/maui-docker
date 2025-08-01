@@ -424,11 +424,21 @@ jobs:
         total_builds=5
         successful_builds=0
         
-        [[ "${{ needs.build-base-linux.result }}" == "success" ]] && ((successful_builds++))
-        [[ "${{ needs.build-base-windows.result }}" == "success" ]] && ((successful_builds++))
-        [[ "${{ needs.build-runner-linux.result }}" == "success" ]] && ((successful_builds++))
-        [[ "${{ needs.build-runner-windows.result }}" == "success" ]] && ((successful_builds++))
-        [[ "${{ needs.build-test-linux.result }}" == "success" ]] && ((successful_builds++))
+        if [ "${{ needs.build-base-linux.result }}" == "success" ]; then
+          successful_builds=$((successful_builds + 1))
+        fi
+        if [ "${{ needs.build-base-windows.result }}" == "success" ]; then
+          successful_builds=$((successful_builds + 1))
+        fi
+        if [ "${{ needs.build-runner-linux.result }}" == "success" ]; then
+          successful_builds=$((successful_builds + 1))
+        fi
+        if [ "${{ needs.build-runner-windows.result }}" == "success" ]; then
+          successful_builds=$((successful_builds + 1))
+        fi
+        if [ "${{ needs.build-test-linux.result }}" == "success" ]; then
+          successful_builds=$((successful_builds + 1))
+        fi
         
         echo "**Overall Status:** $successful_builds/$total_builds builds successful" >> $GITHUB_STEP_SUMMARY
         
