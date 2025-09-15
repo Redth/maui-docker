@@ -4,7 +4,9 @@
 function Find-LatestWorkloadSet {
     param (
         [string]$DotnetVersion,
-        [string]$WorkloadSetVersion = ""
+        [string]$WorkloadSetVersion = "",
+        [bool]$IncludePrerelease = $false,
+        [bool]$AutoDetectPrerelease = $true
     )
     
     Write-Host "Finding latest workload set for .NET $DotnetVersion..."
@@ -16,6 +18,52 @@ function Find-LatestWorkloadSet {
     $majorVersion = $DotnetVersion
     if ($DotnetVersion -match '^(\d+\.\d+)') {
         $majorVersion = $Matches[1]
+    }
+    
+    # Auto-detect if prerelease is needed by first checking for stable versions
+    $effectiveIncludePrerelease = $IncludePrerelease
+    if ($AutoDetectPrerelease -and -not $WorkloadSetVersion) {
+        Write-Host "Auto-detecting if prerelease versions are needed..."
+        
+        # First try to find stable versions
+        $stableResponse = $null
+        $searchPattern = "Microsoft.NET.Workloads.$majorVersion"
+        
+        try {
+            # Try official search endpoint for stable versions
+            $serviceIndex = Invoke-RestMethod -Uri "https://api.nuget.org/v3/index.json"
+            $searchService = $serviceIndex.resources | Where-Object { $_.'@type' -eq 'SearchQueryService' } | Select-Object -First 1
+            
+            if ($searchService) {
+                $searchUrl = "$($searchService.'@id')?q=$searchPattern&prerelease=false&semVerLevel=2.0.0"
+                $stableResponse = Invoke-RestMethod -Uri $searchUrl
+            }
+        }
+        catch {
+            # Fallback to direct search endpoint for stable versions
+            $stableResponse = Invoke-RestMethod -Uri "https://azuresearch-usnc.nuget.org/query?q=$searchPattern&prerelease=false&semVerLevel=2.0.0"
+        }
+        
+        # Filter stable workload sets (match SDK band pattern exactly)
+        $stableWorkloadSets = $stableResponse.data | Where-Object { 
+            # Match: Microsoft.NET.Workloads.{major}.{band} or Microsoft.NET.Workloads.{major}.{band}-{prerelease}
+            # Allow prerelease identifiers with one dot (e.g., rc.1, preview.7) but exclude .Msi.{arch}
+            $_.id -match "^Microsoft\.NET\.Workloads\.$majorVersion\.\d+(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)?)*$"
+        }
+        
+        if ($stableWorkloadSets -and $stableWorkloadSets.Count -gt 0) {
+            Write-Host "Found $($stableWorkloadSets.Count) stable workload sets - using stable versions only"
+            $effectiveIncludePrerelease = $false
+        } else {
+            Write-Host "No stable workload sets found - enabling prerelease search"
+            $effectiveIncludePrerelease = $true
+        }
+    }
+    
+    if ($effectiveIncludePrerelease) {
+        Write-Host "Including prerelease versions in search"
+    } else {
+        Write-Host "Using stable versions only"
     }
     
     # Search for workload set packages using the official NuGet API
@@ -34,7 +82,8 @@ function Find-LatestWorkloadSet {
         }
         
         # Use the official search endpoint
-        $searchUrl = "$($searchService.'@id')?q=$searchPattern&prerelease=false&semVerLevel=2.0.0"
+        $prereleaseParam = if ($effectiveIncludePrerelease) { "true" } else { "false" }
+        $searchUrl = "$($searchService.'@id')?q=$searchPattern&prerelease=$prereleaseParam&semVerLevel=2.0.0"
         Write-Host "Using NuGet search URL: $searchUrl"
         
         $response = Invoke-RestMethod -Uri $searchUrl
@@ -42,14 +91,16 @@ function Find-LatestWorkloadSet {
     catch {
         Write-Warning "Error accessing official NuGet API, falling back to direct search endpoint"
         # Fallback to the direct search endpoint if the service index approach fails
-        $response = Invoke-RestMethod -Uri "https://azuresearch-usnc.nuget.org/query?q=$searchPattern&prerelease=false&semVerLevel=2.0.0"
+        $prereleaseParam = if ($effectiveIncludePrerelease) { "true" } else { "false" }
+        $response = Invoke-RestMethod -Uri "https://azuresearch-usnc.nuget.org/query?q=$searchPattern&prerelease=$prereleaseParam&semVerLevel=2.0.0"
     }
     
-    # Filter to match only exact SDK band versions (e.g., Microsoft.NET.Workloads.9.0.100)
-    # This excludes architecture-specific packages with suffixes like .Msi.x86
+    # Filter to match only SDK band workload sets (e.g., Microsoft.NET.Workloads.9.0.100 or Microsoft.NET.Workloads.10.0.100-rc.1)
+    # This matches the exact SDK band pattern and excludes architecture-specific packages
     $workloadSets = $response.data | Where-Object { 
-        # Match exact pattern: Microsoft\.NET\.Workloads\.$majorVersion\.\d+$
-        $_.id -match "^Microsoft\.NET\.Workloads\.$majorVersion\.\d+$"
+        # Match SDK band pattern: Microsoft.NET.Workloads.{major}.{band} or Microsoft.NET.Workloads.{major}.{band}-{prerelease}
+        # Allow prerelease identifiers with one dot (e.g., rc.1, preview.7) but exclude .Msi.{arch}
+        $_.id -match "^Microsoft\.NET\.Workloads\.$majorVersion\.\d+(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)?)*$"
     }
     
     # If a specific WorkloadSetVersion is provided, filter to only that version
@@ -90,8 +141,8 @@ function Find-LatestWorkloadSet {
     
     # Find the highest version band by parsing the band number
     $highestBand = $versionBands.Keys | ForEach-Object {
-        # Extract the band part (e.g., "100" from "9.0.100")
-        if ($_ -match "$majorVersion\.(\d+)$") {
+        # Extract the band part (e.g., "100" from "9.0.100" or "10.0.100-rc.1")
+        if ($_ -match "$majorVersion\.(\d+)") {
             [PSCustomObject]@{
                 FullBand = $_
                 BandNumber = [int]$Matches[1]
@@ -378,7 +429,8 @@ function Get-WorkloadSetInfo {
     param (
         [string]$DotnetVersion,
         [string]$WorkloadSetVersion = "",
-        [string[]]$WorkloadNames = @("Microsoft.NET.Sdk.Android")
+        [string[]]$WorkloadNames = @("Microsoft.NET.Sdk.Android"),
+        [bool]$IncludePrerelease = $false
     )
     
     # Extract major version (e.g., "9.0" from "9.0.100") for package ID construction
@@ -389,7 +441,7 @@ function Get-WorkloadSetInfo {
     
     # Find the latest workload set if not specified
     if (-not $WorkloadSetVersion) {
-        $latestWorkloadSet = Find-LatestWorkloadSet -DotnetVersion $majorVersion
+        $latestWorkloadSet = Find-LatestWorkloadSet -DotnetVersion $majorVersion -IncludePrerelease $IncludePrerelease -AutoDetectPrerelease $true
         if ($latestWorkloadSet) {
             $WorkloadSetVersion = $latestWorkloadSet.version
             $WorkloadSetId = $latestWorkloadSet.id  # Use the actual package ID from search results
@@ -400,7 +452,7 @@ function Get-WorkloadSetInfo {
         }
     } else {
         # Find the workload set with the specified version
-        $specificWorkloadSet = Find-LatestWorkloadSet -DotnetVersion $majorVersion -WorkloadSetVersion $WorkloadSetVersion
+        $specificWorkloadSet = Find-LatestWorkloadSet -DotnetVersion $majorVersion -WorkloadSetVersion $WorkloadSetVersion -IncludePrerelease $IncludePrerelease -AutoDetectPrerelease $true
         if ($specificWorkloadSet) {
             $WorkloadSetId = $specificWorkloadSet.id  # Use the actual package ID from search results
             Write-Host "Using specified workload set: $WorkloadSetId v$WorkloadSetVersion"
