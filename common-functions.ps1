@@ -554,8 +554,16 @@ function Get-WorkloadSetInfo {
     }
 
     # Convert the WorkloadSetVersion to the format expected by dotnet workload CLI commands
-    $DotnetCommandWorkloadSetVersion = Convert-ToWorkloadVersion -NuGetVersion $WorkloadSetVersion
-    Write-Host "Using dotnet workload CLI version: $DotnetCommandWorkloadSetVersion"
+    # For prerelease versions, we may need to use the original NuGet version format
+    if ($WorkloadSetVersion -match '-') {
+        # This is a prerelease version - use the original NuGet format
+        $DotnetCommandWorkloadSetVersion = $WorkloadSetVersion
+        Write-Host "Using prerelease workload version (NuGet format): $DotnetCommandWorkloadSetVersion"
+    } else {
+        # This is a stable version - convert to CLI format
+        $DotnetCommandWorkloadSetVersion = Convert-ToWorkloadVersion -NuGetVersion $WorkloadSetVersion
+        Write-Host "Using dotnet workload CLI version: $DotnetCommandWorkloadSetVersion"
+    }
 
     # Download and parse the workload set JSON
     $workloadSetJsonContent = Get-NuGetPackageContent -PackageId $WorkloadSetId -Version $WorkloadSetVersion -FilePath "data/microsoft.net.workloads.workloadset.json"
