@@ -113,13 +113,16 @@ if ($DockerPlatform.StartsWith('linux/')) {
         "--build-arg", "BASE_DOCKER_REPOSITORY=$BaseDockerRepository",
         "--build-arg", "GITHUB_ACTIONS_RUNNER_VERSION=2.323.0",
         "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion",
+        "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion-$Version",
         "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion",
         "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion-v$Version"
-        
-        if ($Load) {
-            $buildxArgs += "--load"
-        }
     )
+    
+    # Add load flag if specified (only supported by buildx)
+    if ($Load) {
+        Write-Host "Adding --load flag for Linux build"
+        $buildxArgs += "--load"
+    }
 } else {
     $buildxArgs = @(
         "build",
@@ -127,9 +130,16 @@ if ($DockerPlatform.StartsWith('linux/')) {
         "--build-arg", "BASE_DOCKER_REPOSITORY=$BaseDockerRepository",
         "--build-arg", "GITHUB_ACTIONS_RUNNER_VERSION=2.323.0",
         "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion",
+        "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion-$Version",
         "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion",
         "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion-v$Version"
     )
+    
+    # Skip --load flag for Windows build (not supported by regular docker build)
+    if ($Load) {
+        Write-Host "Skipping --load flag for Windows build (not supported by regular docker build)"
+        # Windows builds use regular docker build - images are automatically loaded
+    }
 }
 
 

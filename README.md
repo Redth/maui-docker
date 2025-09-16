@@ -1,5 +1,5 @@
 # maui-docker
-Docker images for MAUI development/building/testing
+Docker images for MAUI development/building/testing. See the [Repository Guidelines](AGENTS.md) for contributor instructions.
 
 This repository provides three types of Docker images for .NET MAUI development:
 
@@ -36,6 +36,13 @@ FROM redth/maui-build:linux-latest
 - **Development tools** (Git, build tools, etc.)
 
 See [base/README.md](base/README.md) for detailed documentation.
+
+### macOS Host Provisioning
+- Run `pwsh ./provisioning/provision.ps1` to mirror the base image tooling directly on a macOS workstation.
+- Installs .NET, MAUI workloads, Android SDK, and helper tools without Docker.
+- Review [provisioning/README.md](provisioning/README.md) for prerequisites and customization options.
+- Provisioning logic lives in the reusable `MauiProvisioning` PowerShell module under `provisioning/` for advanced scripting scenarios.
+- When Apple workloads are requested, the script also provisions the recommended Xcode build plus matching iOS/tvOS simulator runtimes.
 
 
 

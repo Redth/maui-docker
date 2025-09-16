@@ -77,12 +77,14 @@ Write-Host "Using build context: $contextPath"
 # Build multiple tags for consistency with runner images
 $primaryTag = "$DockerRepository`:$dockerTagBase-$Version"
 $dotnetTag = "$DockerRepository`:$dockerTagBase-dotnet$DotnetVersion"
+$dotnetVersionedTag = "$DockerRepository`:$dockerTagBase-dotnet$DotnetVersion-$Version"
 $workloadTag = "$DockerRepository`:$dockerTagBase-dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion"
 $versionedTag = "$DockerRepository`:$dockerTagBase-dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion-v$Version"
 
 Write-Host "Building Docker image with tags:"
 Write-Host "  Primary: $primaryTag"
 Write-Host "  .NET: $dotnetTag"
+Write-Host "  .NET Versioned: $dotnetVersionedTag"
 Write-Host "  Workloads: $workloadTag"
 Write-Host "  Versioned: $versionedTag"
 
@@ -97,13 +99,23 @@ $buildArgs = @(
     "--platform", $DockerPlatform,
     "--tag", $primaryTag,
     "--tag", $dotnetTag,
+    "--tag", $dotnetVersionedTag,
     "--tag", $workloadTag,
     "--tag", $versionedTag
 )
 
-# Add load flag if specified
+# Add load flag if specified (only supported by buildx, not regular docker build)
+# Regular docker build automatically makes images available locally
 if ($Load) {
-    $buildArgs += @("--load")
+    # Only add --load flag for Linux builds where buildx might be available
+    # Windows runners typically use regular docker build which doesn't support --load
+    if ($DockerPlatform.StartsWith('linux/')) {
+        Write-Host "Adding --load flag for Linux build"
+        $buildArgs += @("--load")
+    } else {
+        Write-Host "Skipping --load flag for Windows build (not supported by regular docker build)"
+        # Windows builds use regular docker build - images are automatically loaded
+    }
 }
 
 # Change to the build context directory
@@ -123,7 +135,7 @@ try {
     
     # Push if requested
     if ($Push) {
-        $tagsToPush = @($primaryTag, $dotnetTag, $workloadTag, $versionedTag)
+        $tagsToPush = @($primaryTag, $dotnetTag, $dotnetVersionedTag, $workloadTag, $versionedTag)
         
         foreach ($tag in $tagsToPush) {
             Write-Host "Pushing image: $tag"

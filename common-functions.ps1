@@ -1,10 +1,94 @@
 # Common PowerShell functions for build scripts
 
+# Function to compare semantic versions with prerelease support
+function Compare-SemanticVersion {
+    param (
+        [string]$Version1,
+        [string]$Version2,
+        [bool]$Prefer1 = $true  # Return true if Version1 should be preferred over Version2
+    )
+    
+    # Parse versions into components
+    function Parse-SemanticVersion($version) {
+        if ($version -match '^(\d+\.\d+\.\d+)(-(.+))?') {
+            $baseVersion = $matches[1]
+            $prerelease = $matches[3]
+            
+            # Parse prerelease components
+            $prereleaseComponents = @()
+            if ($prerelease) {
+                $prereleaseComponents = $prerelease.Split('.')
+            }
+            
+            return @{
+                BaseVersion = [version]$baseVersion
+                Prerelease = $prerelease
+                PrereleaseComponents = $prereleaseComponents
+                IsPrerelease = [bool]$prerelease
+            }
+        }
+        throw "Invalid semantic version: $version"
+    }
+    
+    try {
+        $v1 = Parse-SemanticVersion $Version1
+        $v2 = Parse-SemanticVersion $Version2
+        
+        # Compare base versions first
+        if ($v1.BaseVersion -gt $v2.BaseVersion) {
+            return $Prefer1
+        } elseif ($v1.BaseVersion -lt $v2.BaseVersion) {
+            return -not $Prefer1
+        }
+        
+        # Base versions are equal, handle prerelease comparison
+        if (-not $v1.IsPrerelease -and -not $v2.IsPrerelease) {
+            return $false  # Both are release versions and equal
+        } elseif (-not $v1.IsPrerelease -and $v2.IsPrerelease) {
+            return $Prefer1  # v1 is release, v2 is prerelease - prefer release
+        } elseif ($v1.IsPrerelease -and -not $v2.IsPrerelease) {
+            return -not $Prefer1  # v1 is prerelease, v2 is release - prefer release
+        }
+        
+        # Both are prerelease - compare prerelease identifiers
+        # RC > preview > alpha/beta (RC should be preferred)
+        function Get-PrereleaseRank($prerelease) {
+            if ($prerelease -match '^rc') { return 3 }
+            elseif ($prerelease -match '^preview') { return 2 }
+            else { return 1 }  # alpha, beta, etc.
+        }
+        
+        $rank1 = Get-PrereleaseRank $v1.Prerelease
+        $rank2 = Get-PrereleaseRank $v2.Prerelease
+        
+        if ($rank1 -gt $rank2) {
+            return $Prefer1
+        } elseif ($rank1 -lt $rank2) {
+            return -not $Prefer1
+        }
+        
+        # Same rank - do lexical comparison of full prerelease string
+        if ($v1.Prerelease -gt $v2.Prerelease) {
+            return $Prefer1
+        } elseif ($v1.Prerelease -lt $v2.Prerelease) {
+            return -not $Prefer1
+        }
+        
+        return $false  # Versions are identical
+        
+    } catch {
+        Write-Warning "Error comparing versions $Version1 and $Version2`: $($_.Exception.Message)"
+        return $false
+    }
+}
+
 # Function to find the latest workload set version
 function Find-LatestWorkloadSet {
     param (
         [string]$DotnetVersion,
-        [string]$WorkloadSetVersion = ""
+        [string]$WorkloadSetVersion = "",
+        [bool]$IncludePrerelease = $false,
+        [bool]$AutoDetectPrerelease = $true
     )
     
     Write-Host "Finding latest workload set for .NET $DotnetVersion..."
@@ -16,6 +100,52 @@ function Find-LatestWorkloadSet {
     $majorVersion = $DotnetVersion
     if ($DotnetVersion -match '^(\d+\.\d+)') {
         $majorVersion = $Matches[1]
+    }
+    
+    # Auto-detect if prerelease is needed by first checking for stable versions
+    $effectiveIncludePrerelease = $IncludePrerelease
+    if ($AutoDetectPrerelease -and -not $WorkloadSetVersion) {
+        Write-Host "Auto-detecting if prerelease versions are needed..."
+        
+        # First try to find stable versions
+        $stableResponse = $null
+        $searchPattern = "Microsoft.NET.Workloads.$majorVersion"
+        
+        try {
+            # Try official search endpoint for stable versions
+            $serviceIndex = Invoke-RestMethod -Uri "https://api.nuget.org/v3/index.json"
+            $searchService = $serviceIndex.resources | Where-Object { $_.'@type' -eq 'SearchQueryService' } | Select-Object -First 1
+            
+            if ($searchService) {
+                $searchUrl = "$($searchService.'@id')?q=$searchPattern&prerelease=false&semVerLevel=2.0.0"
+                $stableResponse = Invoke-RestMethod -Uri $searchUrl
+            }
+        }
+        catch {
+            # Fallback to direct search endpoint for stable versions
+            $stableResponse = Invoke-RestMethod -Uri "https://azuresearch-usnc.nuget.org/query?q=$searchPattern&prerelease=false&semVerLevel=2.0.0"
+        }
+        
+        # Filter stable workload sets (match SDK band pattern exactly)
+        $stableWorkloadSets = $stableResponse.data | Where-Object { 
+            # Match: Microsoft.NET.Workloads.{major}.{band} or Microsoft.NET.Workloads.{major}.{band}-{prerelease}
+            # Allow prerelease identifiers with one dot (e.g., rc.1, preview.7) but exclude .Msi.{arch}
+            $_.id -match "^Microsoft\.NET\.Workloads\.$majorVersion\.\d+(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)?)*$"
+        }
+        
+        if ($stableWorkloadSets -and $stableWorkloadSets.Count -gt 0) {
+            Write-Host "Found $($stableWorkloadSets.Count) stable workload sets - using stable versions only"
+            $effectiveIncludePrerelease = $false
+        } else {
+            Write-Host "No stable workload sets found - enabling prerelease search"
+            $effectiveIncludePrerelease = $true
+        }
+    }
+    
+    if ($effectiveIncludePrerelease) {
+        Write-Host "Including prerelease versions in search"
+    } else {
+        Write-Host "Using stable versions only"
     }
     
     # Search for workload set packages using the official NuGet API
@@ -34,7 +164,8 @@ function Find-LatestWorkloadSet {
         }
         
         # Use the official search endpoint
-        $searchUrl = "$($searchService.'@id')?q=$searchPattern&prerelease=false&semVerLevel=2.0.0"
+        $prereleaseParam = if ($effectiveIncludePrerelease) { "true" } else { "false" }
+        $searchUrl = "$($searchService.'@id')?q=$searchPattern&prerelease=$prereleaseParam&semVerLevel=2.0.0"
         Write-Host "Using NuGet search URL: $searchUrl"
         
         $response = Invoke-RestMethod -Uri $searchUrl
@@ -42,14 +173,16 @@ function Find-LatestWorkloadSet {
     catch {
         Write-Warning "Error accessing official NuGet API, falling back to direct search endpoint"
         # Fallback to the direct search endpoint if the service index approach fails
-        $response = Invoke-RestMethod -Uri "https://azuresearch-usnc.nuget.org/query?q=$searchPattern&prerelease=false&semVerLevel=2.0.0"
+        $prereleaseParam = if ($effectiveIncludePrerelease) { "true" } else { "false" }
+        $response = Invoke-RestMethod -Uri "https://azuresearch-usnc.nuget.org/query?q=$searchPattern&prerelease=$prereleaseParam&semVerLevel=2.0.0"
     }
     
-    # Filter to match only exact SDK band versions (e.g., Microsoft.NET.Workloads.9.0.100)
-    # This excludes architecture-specific packages with suffixes like .Msi.x86
+    # Filter to match only SDK band workload sets (e.g., Microsoft.NET.Workloads.9.0.100 or Microsoft.NET.Workloads.10.0.100-rc.1)
+    # This matches the exact SDK band pattern and excludes architecture-specific packages
     $workloadSets = $response.data | Where-Object { 
-        # Match exact pattern: Microsoft\.NET\.Workloads\.$majorVersion\.\d+$
-        $_.id -match "^Microsoft\.NET\.Workloads\.$majorVersion\.\d+$"
+        # Match SDK band pattern: Microsoft.NET.Workloads.{major}.{band} or Microsoft.NET.Workloads.{major}.{band}-{prerelease}
+        # Allow prerelease identifiers with one dot (e.g., rc.1, preview.7) but exclude .Msi.{arch}
+        $_.id -match "^Microsoft\.NET\.Workloads\.$majorVersion\.\d+(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)?)*$"
     }
     
     # If a specific WorkloadSetVersion is provided, filter to only that version
@@ -80,18 +213,27 @@ function Find-LatestWorkloadSet {
     $versionBands = @{}
     
     foreach ($ws in $workloadSets) {
-        $versionBand = $ws.id -replace "Microsoft\.NET\.Workloads\.", ""
+        # Extract base version band (e.g., "10.0.100" from "10.0.100-rc.1" or "10.0.100-preview.6")
+        $fullBand = $ws.id -replace "Microsoft\.NET\.Workloads\.", ""
+        $versionBand = $fullBand
+        if ($fullBand -match '^(\d+\.\d+\.\d+)(-.*)?') {
+            $versionBand = $matches[1]
+        }
         
-        if (-not $versionBands.ContainsKey($versionBand) -or 
-            [version]$ws.version -gt [version]$versionBands[$versionBand].version) {
+        if (-not $versionBands.ContainsKey($versionBand)) {
             $versionBands[$versionBand] = $ws
+        } else {
+            # Compare semantic versions properly (handles prerelease identifiers)
+            if (Compare-SemanticVersion -Version1 $ws.version -Version2 $versionBands[$versionBand].version -Prefer1 $true) {
+                $versionBands[$versionBand] = $ws
+            }
         }
     }
     
     # Find the highest version band by parsing the band number
     $highestBand = $versionBands.Keys | ForEach-Object {
-        # Extract the band part (e.g., "100" from "9.0.100")
-        if ($_ -match "$majorVersion\.(\d+)$") {
+        # Extract the band part (e.g., "100" from "9.0.100" or "10.0.100-rc.1")
+        if ($_ -match "$majorVersion\.(\d+)") {
             [PSCustomObject]@{
                 FullBand = $_
                 BandNumber = [int]$Matches[1]
@@ -162,6 +304,23 @@ function Get-NuGetPackageContent {
 }
 
 # Function to convert NuGet-compatible version to dotnet workload CLI version format
+# 
+# IMPORTANT: .NET CLI uses different version formats than NuGet packages:
+#
+# For STABLE versions:
+#   NuGet Package: Microsoft.NET.Workloads.9.0.300 v9.305.0
+#   CLI Command:   dotnet workload install --version 9.0.305
+#   Conversion:    9.305.0 → 9.0.305 (major.0.patch[.additional])
+#
+# For PRERELEASE versions:  
+#   NuGet Package: Microsoft.NET.Workloads.10.0.100-rc.1 v10.100.0-rc.1.25458.2
+#   CLI Command:   dotnet workload install --version 10.0.100-rc.1.25458.2  
+#   Conversion:    10.100.0-rc.1.25458.2 → 10.0.100-rc.1.25458.2
+#
+# The key insight is that:
+# 1. Package IDs include prerelease suffix: microsoft.net.workloads.10.0.100-rc.1
+# 2. CLI versions keep prerelease suffix but convert base version: 10.0.100-rc.1.25458.2
+# 3. The CLI looks for the package with prerelease suffix in the name
 function Convert-ToWorkloadVersion {
     param (
         [string]$NuGetVersion
@@ -173,11 +332,37 @@ function Convert-ToWorkloadVersion {
     
     Write-Host "Converting NuGet version '$NuGetVersion' to dotnet workload CLI format"
     
-    # Split the version by dots
-    $parts = $NuGetVersion.Split('.')
+    # Check if this is a prerelease version (contains hyphen)
+    if ($NuGetVersion -match '^([^-]+)-(.+)$') {
+        $baseVersion = $matches[1]
+        $prereleaseIdentifier = $matches[2]
+        Write-Host "Detected prerelease version: base='$baseVersion' prerelease='$prereleaseIdentifier'"
+        
+        # Convert the base version and append prerelease
+        $convertedBase = Convert-BaseVersionToCliFormat -BaseVersion $baseVersion
+        $workloadVersion = "$convertedBase-$prereleaseIdentifier"
+        
+        Write-Host "Converted to: $workloadVersion"
+        return $workloadVersion
+    } else {
+        # This is a stable version - use existing logic
+        $workloadVersion = Convert-BaseVersionToCliFormat -BaseVersion $NuGetVersion
+        Write-Host "Converted to: $workloadVersion"
+        return $workloadVersion
+    }
+}
+
+# Helper function to convert base version from NuGet to CLI format
+function Convert-BaseVersionToCliFormat {
+    param (
+        [string]$BaseVersion
+    )
     
-    # NuGet versions are typically in format like 9.203.0 or 9.203.1
-    # Dotnet CLI expects format like 9.0.203 or 9.0.203.1
+    # Split the version by dots
+    $parts = $BaseVersion.Split('.')
+    
+    # NuGet versions are typically in format like 9.203.0 or 10.100.0
+    # Dotnet CLI expects format like 9.0.203 or 10.0.100
     if ($parts.Count -ge 3) {
         $major = $parts[0]
         $minor = "0"  # Always 0 in dotnet CLI format for the second component
@@ -197,13 +382,12 @@ function Convert-ToWorkloadVersion {
             $workloadVersion += ".$($parts[2])"
         }
         
-        Write-Host "Converted to: $workloadVersion"
         return $workloadVersion
     }
     
     # If the format doesn't match our expectations, return the original version
-    Write-Host "Could not convert version, using original: $NuGetVersion"
-    return $NuGetVersion
+    Write-Host "Could not convert version, using original: $BaseVersion"
+    return $BaseVersion
 }
 
 # Parse the version information (format is "version/sdk-band")
@@ -247,7 +431,7 @@ function Get-AndroidWorkloadInfo {
     $systemImageArch = $null
     
     if ($DockerPlatform.StartsWith("linux/")) {
-        $targetPlatform = "linux-x54"
+        $targetPlatform = "linux-x64"
     } elseif ($DockerPlatform.StartsWith("windows/")) {
         $targetPlatform = "win-x64"
     } else {
@@ -261,8 +445,17 @@ function Get-AndroidWorkloadInfo {
     if ($androidInfo) {
         # Extract JDK information
         if ($androidInfo.jdk) {
-            $androidJdkVersionRange = $androidInfo.jdk.version
-            $androidJdkRecommendedVersion = $androidInfo.jdk.recommendedVersion
+            if ($androidInfo.jdk -isnot [string]) {
+                $jdkObject = $androidInfo.jdk.PSObject
+                $versionProperty = $jdkObject.Properties['version']
+                if ($versionProperty) {
+                    $androidJdkVersionRange = $versionProperty.Value
+                }
+                $recommendedProperty = $jdkObject.Properties['recommendedVersion']
+                if ($recommendedProperty) {
+                    $androidJdkRecommendedVersion = $recommendedProperty.Value
+                }
+            }
             
             Write-Host "Found Android JDK info:"
             Write-Host "  Version Range: $androidJdkVersionRange"
@@ -292,7 +485,14 @@ function Get-AndroidWorkloadInfo {
                 }
                 
                 # Get recommended version if available
-                $recommendedVersion = $package.sdkPackage.recommendedVersion
+                $recommendedVersion = $null
+                if ($package.sdkPackage -isnot [string]) {
+                    $sdkPackageObject = $package.sdkPackage.PSObject
+                    $recommendedProperty = $sdkPackageObject.Properties['recommendedVersion']
+                    if ($recommendedProperty) {
+                        $recommendedVersion = $recommendedProperty.Value
+                    }
+                }
                 
                 # Create a structured object with detailed package info
                 if ($packageId) {
@@ -373,12 +573,128 @@ function Get-AndroidWorkloadInfo {
     }
 }
 
+# Function to get iOS workload information from dependencies
+function Get-iOSWorkloadInfo {
+    param (
+        [PSObject]$Dependencies,
+        [string]$DockerPlatform
+    )
+
+    # Initialize variables to store extracted information
+    $xcodeVersionRange = $null
+    $xcodeRecommendedVersion = $null
+    $xcodeMajorVersion = $null
+    $iOSSdkVersion = $null
+
+    Write-Host "Processing dependency information for Microsoft.NET.Sdk.iOS"
+
+    # Extract iOS SDK information from the proper structure
+    $iOSInfo = $Dependencies."microsoft.net.sdk.ios"
+    if ($iOSInfo) {
+        # Extract Xcode information
+        if ($iOSInfo.xcode) {
+            if ($iOSInfo.xcode -isnot [string]) {
+                $xcodeObject = $iOSInfo.xcode.PSObject
+                $versionProperty = $xcodeObject.Properties['version']
+                if ($versionProperty) {
+                    $xcodeVersionRange = $versionProperty.Value
+                }
+                $recommendedProperty = $xcodeObject.Properties['recommendedVersion']
+                if ($recommendedProperty) {
+                    $xcodeRecommendedVersion = $recommendedProperty.Value
+                }
+            }
+
+            Write-Host "Found Xcode info:"
+            Write-Host "  Version Range: $xcodeVersionRange"
+            Write-Host "  Recommended Version: $xcodeRecommendedVersion"
+
+            # Extract major version from recommended version
+            if ($xcodeRecommendedVersion -match '^(\d+)') {
+                $xcodeMajorVersion = [int]$Matches[1]
+                Write-Host "  Extracted Xcode major version: $xcodeMajorVersion"
+            }
+        }
+
+        # Extract iOS SDK version
+        if ($iOSInfo.sdk -and $iOSInfo.sdk.version) {
+            $iOSSdkVersion = $iOSInfo.sdk.version
+            Write-Host "Found iOS SDK version: $iOSSdkVersion"
+        }
+    } else {
+        Write-Warning "No iOS workload information found in dependencies"
+        return $null
+    }
+
+    # Return structured information
+    return @{
+        XcodeVersionRange = $xcodeVersionRange
+        XcodeRecommendedVersion = $xcodeRecommendedVersion
+        XcodeMajorVersion = $xcodeMajorVersion
+        IOSSdkVersion = $iOSSdkVersion
+    }
+}
+
+function Get-TvOSWorkloadInfo {
+    param (
+        [PSObject]$Dependencies,
+        [string]$DockerPlatform
+    )
+
+    $xcodeVersionRange = $null
+    $xcodeRecommendedVersion = $null
+    $xcodeMajorVersion = $null
+    $tvOsSdkVersion = $null
+
+    Write-Host "Processing dependency information for Microsoft.NET.Sdk.tvOS"
+
+    $tvInfo = $Dependencies."microsoft.net.sdk.tvos"
+    if (-not $tvInfo) {
+        Write-Warning "No tvOS workload information found in dependencies"
+        return $null
+    }
+
+    if ($tvInfo.xcode -and $tvInfo.xcode -isnot [string]) {
+        $xcodeObject = $tvInfo.xcode.PSObject
+        $versionProperty = $xcodeObject.Properties['version']
+        if ($versionProperty) {
+            $xcodeVersionRange = $versionProperty.Value
+        }
+        $recommendedProperty = $xcodeObject.Properties['recommendedVersion']
+        if ($recommendedProperty) {
+            $xcodeRecommendedVersion = $recommendedProperty.Value
+        }
+
+        Write-Host "Found tvOS Xcode info:"
+        Write-Host "  Version Range: $xcodeVersionRange"
+        Write-Host "  Recommended Version: $xcodeRecommendedVersion"
+
+        if ($xcodeRecommendedVersion -match '^(\d+)') {
+            $xcodeMajorVersion = [int]$Matches[1]
+            Write-Host "  Extracted Xcode major version: $xcodeMajorVersion"
+        }
+    }
+
+    if ($tvInfo.sdk -and $tvInfo.sdk.version) {
+        $tvOsSdkVersion = $tvInfo.sdk.version
+        Write-Host "Found tvOS SDK version: $tvOsSdkVersion"
+    }
+
+    return @{
+        XcodeVersionRange = $xcodeVersionRange
+        XcodeRecommendedVersion = $xcodeRecommendedVersion
+        XcodeMajorVersion = $xcodeMajorVersion
+        TvOsSdkVersion = $tvOsSdkVersion
+    }
+}
+
 # Function to get workload set information including versions and dependencies
 function Get-WorkloadSetInfo {
     param (
         [string]$DotnetVersion,
         [string]$WorkloadSetVersion = "",
-        [string[]]$WorkloadNames = @("Microsoft.NET.Sdk.Android")
+        [string[]]$WorkloadNames = @("Microsoft.NET.Sdk.Android"),
+        [bool]$IncludePrerelease = $false
     )
     
     # Extract major version (e.g., "9.0" from "9.0.100") for package ID construction
@@ -389,7 +705,7 @@ function Get-WorkloadSetInfo {
     
     # Find the latest workload set if not specified
     if (-not $WorkloadSetVersion) {
-        $latestWorkloadSet = Find-LatestWorkloadSet -DotnetVersion $majorVersion
+        $latestWorkloadSet = Find-LatestWorkloadSet -DotnetVersion $majorVersion -IncludePrerelease $IncludePrerelease -AutoDetectPrerelease $true
         if ($latestWorkloadSet) {
             $WorkloadSetVersion = $latestWorkloadSet.version
             $WorkloadSetId = $latestWorkloadSet.id  # Use the actual package ID from search results
@@ -400,7 +716,7 @@ function Get-WorkloadSetInfo {
         }
     } else {
         # Find the workload set with the specified version
-        $specificWorkloadSet = Find-LatestWorkloadSet -DotnetVersion $majorVersion -WorkloadSetVersion $WorkloadSetVersion
+        $specificWorkloadSet = Find-LatestWorkloadSet -DotnetVersion $majorVersion -WorkloadSetVersion $WorkloadSetVersion -IncludePrerelease $IncludePrerelease -AutoDetectPrerelease $true
         if ($specificWorkloadSet) {
             $WorkloadSetId = $specificWorkloadSet.id  # Use the actual package ID from search results
             Write-Host "Using specified workload set: $WorkloadSetId v$WorkloadSetVersion"
@@ -483,10 +799,11 @@ function Get-WorkloadInfo {
         [string]$WorkloadSetVersion = "",
         [switch]$IncludeAndroid,
         [switch]$IncludeiOS,
+        [switch]$IncludeTvOS,
         [switch]$IncludeMaui,
         [string]$DockerPlatform
     )
-    
+
     # Determine which workloads to include
     $workloadNames = @()
     if ($IncludeAndroid) {
@@ -495,13 +812,16 @@ function Get-WorkloadInfo {
     if ($IncludeiOS) {
         $workloadNames += "Microsoft.NET.Sdk.iOS"
     }
+    if ($IncludeTvOS) {
+        $workloadNames += "Microsoft.NET.Sdk.tvOS"
+    }
     if ($IncludeMaui) {
         $workloadNames += "Microsoft.NET.Sdk.Maui"
     }
     
     # If no specific workloads selected, include all supported ones
     if ($workloadNames.Count -eq 0) {
-        $workloadNames = @("Microsoft.NET.Sdk.Android", "Microsoft.NET.Sdk.iOS", "Microsoft.NET.Sdk.Maui")
+        $workloadNames = @("Microsoft.NET.Sdk.Android", "Microsoft.NET.Sdk.iOS", "Microsoft.NET.Sdk.tvOS", "Microsoft.NET.Sdk.Maui")
         Write-Host "No specific workloads selected, including all supported workloads."
     }
     
@@ -554,9 +874,14 @@ function Get-WorkloadInfo {
             }
             "Microsoft.NET.Sdk.iOS" {
                 if ($IncludeiOS) {
-                    # For future implementation - iOS-specific info parser
-                    # $iOSInfo = Get-iOSWorkloadInfo -Dependencies $workload.Dependencies -DockerPlatform $DockerPlatform
-                    # $workloadResult.Details = $iOSInfo
+                    $iOSInfo = Get-iOSWorkloadInfo -Dependencies $workload.Dependencies -DockerPlatform $DockerPlatform
+                    $workloadResult.Details = $iOSInfo
+                }
+            }
+            "Microsoft.NET.Sdk.tvOS" {
+                if ($IncludeTvOS) {
+                    $tvOsInfo = Get-TvOSWorkloadInfo -Dependencies $workload.Dependencies -DockerPlatform $DockerPlatform
+                    $workloadResult.Details = $tvOsInfo
                 }
             }
             "Microsoft.NET.Sdk.Maui" {

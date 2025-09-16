@@ -20,7 +20,7 @@ jobs:
 
     strategy:
       matrix:
-        DOTNET_VERSION: [ "9.0" ]
+        DOTNET_VERSION: [ "9.0", "10.0" ]
 
     steps:
     - name: 🛒 Checkout
@@ -71,7 +71,7 @@ jobs:
 
     strategy:
       matrix:
-        DOTNET_VERSION: [ "9.0" ]
+        DOTNET_VERSION: [ "9.0", "10.0" ]
 
     steps:
     - name: 🛒 Checkout
