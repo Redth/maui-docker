@@ -1,5 +1,5 @@
 # maui-docker
-Docker images for MAUI development/building/testing
+Docker images for MAUI development/building/testing. See the [Repository Guidelines](AGENTS.md) for contributor instructions.
 
 This repository provides three types of Docker images for .NET MAUI development:
 
