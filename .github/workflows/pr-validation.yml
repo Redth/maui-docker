@@ -20,7 +20,7 @@ on:
         description: 'Test subset: all, base-only, or single-platform'
         required: false
         type: choice
-        default: 'base-only'
+        default: 'all'
         options:
           - 'all'
           - 'base-only' 
