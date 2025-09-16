@@ -1,0 +1,490 @@
+name: 🔍 PR Validation - Build Docker Images
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'base/**'
+      - 'runner/**'
+      - 'test/**'
+      - 'common-functions.ps1'
+      - '.github/workflows/**'
+  workflow_dispatch:
+    inputs:
+      dotnet_versions:
+        description: 'JSON array of .NET versions to test (e.g., ["9.0", "10.0"])'
+        required: false
+        type: string
+        default: '["9.0", "10.0"]'
+      test_subset:
+        description: 'Test subset: all, base-only, or single-platform'
+        required: false
+        type: choice
+        default: 'base-only'
+        options:
+          - 'all'
+          - 'base-only' 
+          - 'single-platform'
+
+env:
+  # Use test repository names to avoid conflicts
+  DOCKER_REPOSITORY_BASE: pr-test/maui-build
+  DOCKER_REPOSITORY_RUNNER: pr-test/maui-actions-runner
+  DOCKER_REPOSITORY_TEST: pr-test/maui-testing
+
+jobs:
+  # Step 1: Validate workload discovery and build preparation
+  validate-workloads:
+    name: 🔍 Validate Workload Discovery
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.determine-matrix.outputs.matrix }}
+      workload-summary: ${{ steps.get-workload-info.outputs.workload-summary }}
+    
+    steps:
+    - name: 🛒 Checkout
+      uses: actions/checkout@v4
+
+    - name: 🔍 Test Workload Discovery
+      id: get-workload-info
+      shell: pwsh
+      run: |
+        # Import common functions
+        . ./common-functions.ps1
+        
+        # Define .NET versions to check
+        $dotnetVersionsInput = '${{ inputs.dotnet_versions }}'
+        $dotnetVersions = if ($dotnetVersionsInput -ne "") {
+          $dotnetVersionsInput | ConvertFrom-Json
+        } else {
+          @("9.0", "10.0")
+        }
+        
+        Write-Host "## Workload Discovery Test Results" >> $env:GITHUB_STEP_SUMMARY
+        Write-Host "" >> $env:GITHUB_STEP_SUMMARY
+        
+        $workloadSummary = @{}
+        $allSuccessful = $true
+        
+        foreach ($dotnetVersion in $dotnetVersions) {
+          Write-Host "Testing workload discovery for .NET $dotnetVersion"
+          
+          try {
+            $workloadInfo = Get-WorkloadInfo -DotnetVersion $dotnetVersion -IncludeAndroid -DockerPlatform "linux/amd64"
+            
+            if ($workloadInfo -and $workloadInfo.Workloads["Microsoft.NET.Sdk.Android"] -and $workloadInfo.Workloads["Microsoft.NET.Sdk.Android"].Details) {
+              $androidInfo = $workloadInfo.Workloads["Microsoft.NET.Sdk.Android"]
+              $workloadSummary[$dotnetVersion] = @{
+                Success = $true
+                WorkloadSetVersion = $workloadInfo.WorkloadSetVersion
+                AndroidVersion = $androidInfo.Version
+                ApiLevel = $androidInfo.Details.ApiLevel
+                JdkVersion = $androidInfo.Details.JdkMajorVersion
+              }
+              
+              Write-Host "### ✅ .NET $dotnetVersion" >> $env:GITHUB_STEP_SUMMARY
+              Write-Host "- **Workload Set:** $($workloadInfo.WorkloadSetVersion)" >> $env:GITHUB_STEP_SUMMARY
+              Write-Host "- **Android API Level:** $($androidInfo.Details.ApiLevel)" >> $env:GITHUB_STEP_SUMMARY
+              Write-Host "- **JDK Version:** $($androidInfo.Details.JdkMajorVersion)" >> $env:GITHUB_STEP_SUMMARY
+              Write-Host "" >> $env:GITHUB_STEP_SUMMARY
+            } else {
+              throw "Failed to get Android workload information"
+            }
+          }
+          catch {
+            $allSuccessful = $false
+            $workloadSummary[$dotnetVersion] = @{
+              Success = $false
+              Error = $_.Exception.Message
+            }
+            
+            Write-Host "### ❌ .NET $dotnetVersion" >> $env:GITHUB_STEP_SUMMARY
+            Write-Host "- **Error:** $($_.Exception.Message)" >> $env:GITHUB_STEP_SUMMARY
+            Write-Host "" >> $env:GITHUB_STEP_SUMMARY
+          }
+        }
+        
+        if (-not $allSuccessful) {
+          Write-Error "Workload discovery failed for one or more .NET versions"
+          exit 1
+        }
+        
+        # Output the workload summary as JSON
+        $workloadSummaryJson = $workloadSummary | ConvertTo-Json -Compress -Depth 3
+        echo "workload-summary=$workloadSummaryJson" >> $env:GITHUB_OUTPUT
+
+    - name: 🎯 Determine Build Matrix
+      id: determine-matrix
+      shell: pwsh
+      run: |
+        # Parse workload summary
+        $workloadSummary = '${{ steps.get-workload-info.outputs.workload-summary }}' | ConvertFrom-Json
+        
+        # Define .NET versions to use
+        $dotnetVersionsInput = '${{ inputs.dotnet_versions }}'
+        $dotnetVersions = if ($dotnetVersionsInput -ne "") {
+          $dotnetVersionsInput | ConvertFrom-Json
+        } else {
+          @("9.0", "10.0")
+        }
+        
+        # Determine subset based on input
+        $testSubset = '${{ inputs.test_subset }}'
+        if ($testSubset -eq "") { $testSubset = "base-only" }
+        
+        Write-Host "Test subset: $testSubset"
+        
+        # Create matrix based on test subset
+        $matrix = @()
+        
+        if ($testSubset -eq "single-platform") {
+          # Only test one .NET version on Linux base
+          $matrix += @{
+            dotnet_version = $dotnetVersions[0]
+            image_type = "base"
+            platform = "linux"
+            runner_os = "ubuntu-latest"
+          }
+        }
+        elseif ($testSubset -eq "base-only") {
+          # Test base images for all .NET versions and platforms
+          foreach ($dotnetVersion in $dotnetVersions) {
+            $matrix += @{
+              dotnet_version = $dotnetVersion
+              image_type = "base"
+              platform = "linux"
+              runner_os = "ubuntu-latest"
+            }
+            $matrix += @{
+              dotnet_version = $dotnetVersion
+              image_type = "base"
+              platform = "windows"
+              runner_os = "windows-latest"
+            }
+          }
+        }
+        else {
+          # Test all image types (full test)
+          foreach ($dotnetVersion in $dotnetVersions) {
+            # Base images
+            $matrix += @{
+              dotnet_version = $dotnetVersion
+              image_type = "base"
+              platform = "linux"
+              runner_os = "ubuntu-latest"
+            }
+            $matrix += @{
+              dotnet_version = $dotnetVersion
+              image_type = "base"
+              platform = "windows"
+              runner_os = "windows-latest"
+            }
+            
+            # Runner images (depend on base)
+            $matrix += @{
+              dotnet_version = $dotnetVersion
+              image_type = "runner"
+              platform = "linux"
+              runner_os = "ubuntu-latest"
+              depends_on = "base"
+            }
+            $matrix += @{
+              dotnet_version = $dotnetVersion
+              image_type = "runner"
+              platform = "windows"
+              runner_os = "windows-latest"
+              depends_on = "base"
+            }
+            
+            # Test image (Linux only, API 35)
+            $matrix += @{
+              dotnet_version = $dotnetVersion
+              image_type = "test"
+              platform = "linux"
+              runner_os = "ubuntu-latest"
+              depends_on = "base"
+              android_api_level = 35
+            }
+          }
+        }
+        
+        # Convert to GitHub Actions matrix format
+        $matrixJson = @{ include = $matrix } | ConvertTo-Json -Compress -Depth 3
+        Write-Host "Matrix: $matrixJson"
+        echo "matrix=$matrixJson" >> $env:GITHUB_OUTPUT
+
+  # Step 2: Build Images (no push)
+  build-images:
+    name: 🔨 Build ${{ matrix.image_type }} (${{ matrix.platform }}, .NET ${{ matrix.dotnet_version }})
+    runs-on: ${{ matrix.runner_os }}
+    needs: validate-workloads
+    if: needs.validate-workloads.result == 'success'
+    strategy:
+      matrix: ${{ fromJson(needs.validate-workloads.outputs.matrix) }}
+      fail-fast: false
+      max-parallel: 4  # Limit parallel builds to avoid resource issues
+    
+    steps:
+    - name: 🛒 Checkout
+      uses: actions/checkout@v4
+
+    - name: 💾 Setup Docker Buildx
+      if: matrix.platform == 'linux'
+      uses: docker/setup-buildx-action@v3
+
+    - name: 🔨 Build ${{ matrix.image_type }} Image
+      shell: pwsh
+      run: |
+        Write-Host "Building ${{ matrix.image_type }} image for .NET ${{ matrix.dotnet_version }} on ${{ matrix.platform }}"
+        
+        # Determine build script and parameters
+        $dockerPlatform = "${{ matrix.platform }}/amd64"
+        
+        if ("${{ matrix.image_type }}" -eq "base") {
+          $buildArgs = @{
+            DotNetVersion     = "${{ matrix.dotnet_version }}"
+            DockerRepository  = "${{ env.DOCKER_REPOSITORY_BASE }}"
+            DockerPlatform    = $dockerPlatform
+            Version           = "pr-test"
+            Push              = $false  # Never push in PR validation
+            Load              = $true   # Load locally for validation
+          }
+          ./base/base-build.ps1 @buildArgs
+        }
+        elseif ("${{ matrix.image_type }}" -eq "runner") {
+          $buildArgs = @{
+            DotNetVersion         = "${{ matrix.dotnet_version }}"
+            DockerRepository      = "${{ env.DOCKER_REPOSITORY_RUNNER }}"
+            DockerPlatform        = $dockerPlatform
+            BaseDockerRepository  = "${{ env.DOCKER_REPOSITORY_BASE }}"
+            Version               = "pr-test"
+            Push                  = $false  # Never push in PR validation
+            Load                  = $true   # Load locally for validation
+          }
+          ./runner/runner-build.ps1 @buildArgs
+        }
+        elseif ("${{ matrix.image_type }}" -eq "test") {
+          $buildArgs = @{
+            DotnetVersion         = "${{ matrix.dotnet_version }}"
+            DockerRepository      = "${{ env.DOCKER_REPOSITORY_TEST }}"
+            BaseDockerRepository  = "${{ env.DOCKER_REPOSITORY_BASE }}"
+            DockerPlatform        = $dockerPlatform
+            AndroidApiLevel       = "${{ matrix.android_api_level }}"
+            Push                  = $false  # Never push in PR validation
+            Load                  = $true   # Load locally for validation
+          }
+          ./test/build.ps1 @buildArgs
+        }
+
+    - name: 🔍 Validate Built Image
+      shell: pwsh
+      run: |
+        # Construct expected image name
+        $imageName = ""
+        if ("${{ matrix.image_type }}" -eq "base") {
+          $imageName = "${{ env.DOCKER_REPOSITORY_BASE }}:${{ matrix.platform }}-dotnet${{ matrix.dotnet_version }}-pr-test"
+        }
+        elseif ("${{ matrix.image_type }}" -eq "runner") {
+          $imageName = "${{ env.DOCKER_REPOSITORY_RUNNER }}:${{ matrix.platform }}-dotnet${{ matrix.dotnet_version }}-pr-test"
+        }
+        elseif ("${{ matrix.image_type }}" -eq "test") {
+          $imageName = "${{ env.DOCKER_REPOSITORY_TEST }}:appium-emulator-${{ matrix.platform }}-android${{ matrix.android_api_level }}-dotnet${{ matrix.dotnet_version }}-pr-test"
+        }
+        
+        Write-Host "Validating image: $imageName"
+        
+        # Check if image exists
+        $imageExists = docker images --format "{{.Repository}}:{{.Tag}}" | Select-String -Pattern "$imageName"
+        
+        if ($imageExists) {
+          Write-Host "✅ Image built successfully: $imageName"
+          
+          # Get image info
+          $imageInfo = docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedAt}}" --filter "reference=$imageName"
+          Write-Host "Image details:"
+          Write-Host $imageInfo
+        } else {
+          Write-Error "❌ Image not found: $imageName"
+          Write-Host "Available images:"
+          docker images
+          exit 1
+        }
+
+    - name: 🧪 Basic Image Test
+      if: matrix.image_type == 'base'
+      shell: pwsh  
+      run: |
+        # Construct image name
+        $imageName = "${{ env.DOCKER_REPOSITORY_BASE }}:${{ matrix.platform }}-dotnet${{ matrix.dotnet_version }}-pr-test"
+        
+        Write-Host "Testing basic functionality of: $imageName"
+        
+        if ("${{ matrix.platform }}" -eq "linux") {
+          # Test dotnet command
+          $dotnetVersion = docker run --rm $imageName dotnet --version
+          Write-Host "✅ .NET Version: $dotnetVersion"
+          
+          # Test MAUI workload is installed
+          $workloads = docker run --rm $imageName dotnet workload list
+          if ($workloads -match "maui") {
+            Write-Host "✅ MAUI workload is installed"
+          } else {
+            Write-Warning "⚠️ MAUI workload may not be installed"
+          }
+          
+          # Test PowerShell
+          $pwshVersion = docker run --rm $imageName pwsh -c '$PSVersionTable.PSVersion'
+          Write-Host "✅ PowerShell Version: $pwshVersion"
+          
+          # Test Android SDK tools are available
+          $androidHome = docker run --rm $imageName bash -c 'echo $ANDROID_HOME'
+          Write-Host "✅ Android Home: $androidHome"
+          
+          # Test key Android tools
+          $androidSdkTools = docker run --rm $imageName bash -c 'ls $ANDROID_HOME/cmdline-tools/*/bin/sdkmanager 2>/dev/null | head -1'
+          if ($androidSdkTools) {
+            Write-Host "✅ Android SDK Manager found"
+          } else {
+            Write-Warning "⚠️ Android SDK Manager not found"
+          }
+          
+          # Test Java installation
+          $javaVersion = docker run --rm $imageName bash -c 'java -version 2>&1 | head -1'
+          Write-Host "✅ Java Version: $javaVersion"
+        }
+        elseif ("${{ matrix.platform }}" -eq "windows") {
+          # Test dotnet command (Windows)
+          $dotnetVersion = docker run --rm $imageName powershell -c "dotnet --version"
+          Write-Host "✅ .NET Version: $dotnetVersion"
+          
+          # Test MAUI workload is installed (Windows)
+          $workloads = docker run --rm $imageName powershell -c "dotnet workload list"
+          if ($workloads -match "maui") {
+            Write-Host "✅ MAUI workload is installed"
+          } else {
+            Write-Warning "⚠️ MAUI workload may not be installed"
+          }
+          
+          # Test Android SDK tools are available (Windows)
+          $androidHome = docker run --rm $imageName powershell -c 'echo $env:ANDROID_HOME'
+          Write-Host "✅ Android Home: $androidHome"
+          
+          # Test Java installation (Windows)
+          $javaVersion = docker run --rm $imageName powershell -c 'java -version 2>&1 | Select-Object -First 1'
+          Write-Host "✅ Java Version: $javaVersion"
+        }
+
+    - name: 🧪 Runner Image Test  
+      if: matrix.image_type == 'runner'
+      shell: pwsh
+      run: |
+        # Construct image name
+        $imageName = "${{ env.DOCKER_REPOSITORY_RUNNER }}:${{ matrix.platform }}-dotnet${{ matrix.dotnet_version }}-pr-test"
+        
+        Write-Host "Testing runner functionality of: $imageName"
+        
+        if ("${{ matrix.platform }}" -eq "linux") {
+          # Test that GitHub Actions runner files are present
+          $runnerScript = docker run --rm $imageName bash -c 'ls /actions-runner/run.sh 2>/dev/null && echo "found" || echo "not found"'
+          if ($runnerScript -eq "found") {
+            Write-Host "✅ GitHub Actions runner script found"
+          } else {
+            Write-Warning "⚠️ GitHub Actions runner script not found"
+          }
+        }
+        elseif ("${{ matrix.platform }}" -eq "windows") {
+          # Test that GitHub Actions runner files are present (Windows)
+          $runnerScript = docker run --rm $imageName powershell -c 'if (Test-Path "C:\actions-runner\run.cmd") { "found" } else { "not found" }'
+          if ($runnerScript -eq "found") {
+            Write-Host "✅ GitHub Actions runner script found"
+          } else {
+            Write-Warning "⚠️ GitHub Actions runner script not found"
+          }
+        }
+
+    - name: 🧪 Test Image Test
+      if: matrix.image_type == 'test'
+      shell: pwsh
+      run: |
+        # Construct image name  
+        $imageName = "${{ env.DOCKER_REPOSITORY_TEST }}:appium-emulator-${{ matrix.platform }}-android${{ matrix.android_api_level }}-dotnet${{ matrix.dotnet_version }}-pr-test"
+        
+        Write-Host "Testing Appium/Emulator functionality of: $imageName"
+        
+        # Test that Appium is installed
+        $appiumVersion = docker run --rm $imageName bash -c 'appium --version 2>/dev/null || echo "not found"'
+        if ($appiumVersion -ne "not found") {
+          Write-Host "✅ Appium Version: $appiumVersion"
+        } else {
+          Write-Warning "⚠️ Appium not found"
+        }
+        
+        # Test that Android Emulator is available
+        $emulatorPath = docker run --rm $imageName bash -c 'which emulator 2>/dev/null || echo "not found"'
+        if ($emulatorPath -ne "not found") {
+          Write-Host "✅ Android Emulator found at: $emulatorPath"
+        } else {
+          Write-Warning "⚠️ Android Emulator not found"
+        }
+        
+        # Test that the correct Android API level system image is installed
+        $systemImages = docker run --rm $imageName bash -c 'ls $ANDROID_HOME/system-images/android-${{ matrix.android_api_level }}/ 2>/dev/null | head -5 || echo "not found"'
+        if ($systemImages -ne "not found") {
+          Write-Host "✅ Android ${{ matrix.android_api_level }} system images found"
+        } else {
+          Write-Warning "⚠️ Android ${{ matrix.android_api_level }} system images not found"
+        }
+
+  # Step 3: Summary and cleanup
+  pr-validation-summary:
+    name: 📋 PR Validation Summary
+    runs-on: ubuntu-latest
+    needs: [validate-workloads, build-images]
+    if: always()
+    
+    steps:
+    - name: 📋 Generate PR Summary
+      run: |
+        echo "## 🔍 PR Validation Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Workload validation results
+        echo "### Workload Discovery" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ needs.validate-workloads.result }}" == "success" ]; then
+          echo "✅ **Workload discovery passed** - All .NET versions successfully resolved workload sets" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Workload discovery failed** - Check workload discovery step for details" >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Build results
+        echo "### Docker Image Builds" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ needs.build-images.result }}" == "success" ]; then
+          echo "✅ **All image builds successful** - Images built and validated locally" >> $GITHUB_STEP_SUMMARY
+        elif [ "${{ needs.build-images.result }}" == "failure" ]; then
+          echo "❌ **Some image builds failed** - Check individual build jobs for details" >> $GITHUB_STEP_SUMMARY
+        elif [ "${{ needs.build-images.result }}" == "cancelled" ]; then
+          echo "⚠️ **Image builds cancelled** - Builds were cancelled (possibly due to workload validation failure)" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⏭️ **Image builds skipped** - Builds were skipped due to earlier failures" >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Overall status
+        echo "### Overall Status" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ needs.validate-workloads.result }}" == "success" ] && [ "${{ needs.build-images.result }}" == "success" ]; then
+          echo "🎉 **PR validation passed!** This PR is ready for review." >> $GITHUB_STEP_SUMMARY
+        else
+          echo "🚫 **PR validation failed** - Please fix the issues before merging." >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Note:** No images were pushed to registries during this validation." >> $GITHUB_STEP_SUMMARY
+
+    - name: 🔍 Set Job Status  
+      run: |
+        if [ "${{ needs.validate-workloads.result }}" != "success" ] || [ "${{ needs.build-images.result }}" != "success" ]; then
+          echo "PR validation failed"
+          exit 1
+        else
+          echo "PR validation passed"
+        fi
