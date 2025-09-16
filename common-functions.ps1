@@ -1,5 +1,87 @@
 # Common PowerShell functions for build scripts
 
+# Function to compare semantic versions with prerelease support
+function Compare-SemanticVersion {
+    param (
+        [string]$Version1,
+        [string]$Version2,
+        [bool]$Prefer1 = $true  # Return true if Version1 should be preferred over Version2
+    )
+    
+    # Parse versions into components
+    function Parse-SemanticVersion($version) {
+        if ($version -match '^(\d+\.\d+\.\d+)(-(.+))?') {
+            $baseVersion = $matches[1]
+            $prerelease = $matches[3]
+            
+            # Parse prerelease components
+            $prereleaseComponents = @()
+            if ($prerelease) {
+                $prereleaseComponents = $prerelease.Split('.')
+            }
+            
+            return @{
+                BaseVersion = [version]$baseVersion
+                Prerelease = $prerelease
+                PrereleaseComponents = $prereleaseComponents
+                IsPrerelease = [bool]$prerelease
+            }
+        }
+        throw "Invalid semantic version: $version"
+    }
+    
+    try {
+        $v1 = Parse-SemanticVersion $Version1
+        $v2 = Parse-SemanticVersion $Version2
+        
+        # Compare base versions first
+        if ($v1.BaseVersion -gt $v2.BaseVersion) {
+            return $Prefer1
+        } elseif ($v1.BaseVersion -lt $v2.BaseVersion) {
+            return -not $Prefer1
+        }
+        
+        # Base versions are equal, handle prerelease comparison
+        if (-not $v1.IsPrerelease -and -not $v2.IsPrerelease) {
+            return $false  # Both are release versions and equal
+        } elseif (-not $v1.IsPrerelease -and $v2.IsPrerelease) {
+            return $Prefer1  # v1 is release, v2 is prerelease - prefer release
+        } elseif ($v1.IsPrerelease -and -not $v2.IsPrerelease) {
+            return -not $Prefer1  # v1 is prerelease, v2 is release - prefer release
+        }
+        
+        # Both are prerelease - compare prerelease identifiers
+        # RC > preview > alpha/beta (RC should be preferred)
+        function Get-PrereleaseRank($prerelease) {
+            if ($prerelease -match '^rc') { return 3 }
+            elseif ($prerelease -match '^preview') { return 2 }
+            else { return 1 }  # alpha, beta, etc.
+        }
+        
+        $rank1 = Get-PrereleaseRank $v1.Prerelease
+        $rank2 = Get-PrereleaseRank $v2.Prerelease
+        
+        if ($rank1 -gt $rank2) {
+            return $Prefer1
+        } elseif ($rank1 -lt $rank2) {
+            return -not $Prefer1
+        }
+        
+        # Same rank - do lexical comparison of full prerelease string
+        if ($v1.Prerelease -gt $v2.Prerelease) {
+            return $Prefer1
+        } elseif ($v1.Prerelease -lt $v2.Prerelease) {
+            return -not $Prefer1
+        }
+        
+        return $false  # Versions are identical
+        
+    } catch {
+        Write-Warning "Error comparing versions $Version1 and $Version2`: $($_.Exception.Message)"
+        return $false
+    }
+}
+
 # Function to find the latest workload set version
 function Find-LatestWorkloadSet {
     param (
@@ -131,11 +213,20 @@ function Find-LatestWorkloadSet {
     $versionBands = @{}
     
     foreach ($ws in $workloadSets) {
-        $versionBand = $ws.id -replace "Microsoft\.NET\.Workloads\.", ""
+        # Extract base version band (e.g., "10.0.100" from "10.0.100-rc.1" or "10.0.100-preview.6")
+        $fullBand = $ws.id -replace "Microsoft\.NET\.Workloads\.", ""
+        $versionBand = $fullBand
+        if ($fullBand -match '^(\d+\.\d+\.\d+)(-.*)?') {
+            $versionBand = $matches[1]
+        }
         
-        if (-not $versionBands.ContainsKey($versionBand) -or 
-            [version]$ws.version -gt [version]$versionBands[$versionBand].version) {
+        if (-not $versionBands.ContainsKey($versionBand)) {
             $versionBands[$versionBand] = $ws
+        } else {
+            # Compare semantic versions properly (handles prerelease identifiers)
+            if (Compare-SemanticVersion -Version1 $ws.version -Version2 $versionBands[$versionBand].version -Prefer1 $true) {
+                $versionBands[$versionBand] = $ws
+            }
         }
     }
     
