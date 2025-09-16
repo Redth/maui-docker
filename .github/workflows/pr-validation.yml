@@ -375,7 +375,7 @@ jobs:
             Write-Host "✅ Java is installed and available"
             # Try to get version for informational purposes (non-failing)
             try {
-              $javaVersionOutput = docker run --rm $imageName powershell -c 'java -version 2>&1' 2>$null
+              $javaVersionOutput = docker run --rm $imageName powershell -c 'java -version 2>&1'
               if ($javaVersionOutput) {
                 $versionLine = $javaVersionOutput | Select-String "openjdk|java" | Select-Object -First 1
                 if ($versionLine) {
