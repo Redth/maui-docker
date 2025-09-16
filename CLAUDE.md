@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This repository builds Docker images for .NET MAUI development, testing, and CI/CD. It provides three main types of Docker images:
 
 1. **Base Images** (`base/`) - MAUI development environment without GitHub Actions runner
-2. **Runner Images** (`runner/`) - Base images + GitHub Actions runner for CI/CD  
+2. **Runner Images** (`runner/`) - Base images + GitHub Actions runner for CI/CD
 3. **Test Images** (`test/`) - Ready-to-use testing environment with Appium and Android Emulator
 
 ## Build Commands
@@ -18,7 +18,7 @@ This repository builds Docker images for .NET MAUI development, testing, and CI/
 ./base/linux/build.ps1 -DotnetVersion "9.0" -DockerRepository "your-repo/maui-build" -Version "latest"
 ./base/linux/build.ps1 -DotnetVersion "10.0" -DockerRepository "your-repo/maui-build" -Version "latest"
 
-# Windows base image  
+# Windows base image
 ./base/windows/build.ps1 -DotnetVersion "9.0" -DockerRepository "your-repo/maui-build" -Version "latest"
 ./base/windows/build.ps1 -DotnetVersion "10.0" -DockerRepository "your-repo/maui-build" -Version "latest"
 
@@ -81,7 +81,7 @@ Key functions:
 Base Image (MAUI Dev Environment)
     ↓
 Runner Image (Base + GitHub Actions Runner)
-    ↓  
+    ↓
 Test Image (Runner + Appium + Android Emulator)
 ```
 
@@ -91,7 +91,7 @@ Test Image (Runner + Appium + Android Emulator)
 
 ### .NET Version Support
 - **.NET 8**: Stable release workloads (8.414.0)
-- **.NET 9**: Stable release workloads (9.305.0) 
+- **.NET 9**: Stable release workloads (9.305.0)
 - **.NET 10**: Prerelease workloads (RC1, previews) - automatically detected
 - **Future versions**: Auto-adapts when stable versions become available
 
@@ -105,7 +105,7 @@ The build system:
 Comprehensive CI/CD workflows in `.github/workflows/`:
 - `build-all.yml` - Builds all image types with matrix strategy
 - `build-base.yml` - Builds base images only
-- `build-runner.yml` - Builds runner images only  
+- `build-runner.yml` - Builds runner images only
 - `build-test.yml` - Builds test images for multiple API levels
 - `check-workload-updates.yml` - Monitors for workload updates
 
@@ -140,7 +140,7 @@ The repository includes a dedicated PR validation workflow (`pr-validation.yml`)
 
 For runner images:
 - `GITHUB_TOKEN` - Required for runner registration
-- `GITHUB_ORG` - GitHub organization 
+- `GITHUB_ORG` - GitHub organization
 - `GITHUB_REPO` - Repository name (optional, defaults to org-level)
 - `RUNNER_NAME` - Custom runner name
 - `INIT_PWSH_SCRIPT` - Custom PowerShell initialization script
@@ -158,3 +158,117 @@ The test images are designed for UI testing with Appium and include:
 - Appium Server with UIAutomator2 driver
 - Automatic service startup on container launch
 - Support for mapping APK volumes for testing
+
+## macOS Provisioning Module
+
+### Overview
+The `provisioning/` directory contains a PowerShell module (`MauiProvisioning`) that provisions macOS hosts with the same developer tooling available in the Docker base images. This allows developers to build and test MAUI applications directly on macOS hardware without containers.
+
+### Module Architecture
+
+The provisioning system is organized as a PowerShell module located at `provisioning/MauiProvisioning/` with:
+- **Public/**: Contains the main entry point `Invoke-MauiProvisioning.ps1`
+- **Private/**: Helper functions for internal use
+- **MauiProvisioning.psd1**: Module manifest defining exports and metadata
+- **MauiProvisioning.psm1**: Module loader that imports all functions
+
+### Key Components Installed
+
+1. **.NET SDK**: Latest SDK for the specified channel (e.g., 9.0, 10.0)
+2. **MAUI Workloads**: `maui` and `wasm-tools` workloads with aligned workload set versions
+3. **Microsoft OpenJDK**: Brew cask installation (e.g., `microsoft-openjdk@17`)
+4. **Android SDK**:
+   - Platform tools
+   - Build tools (version aligned with workload requirements)
+   - Command line tools
+   - Target platform API
+5. **Dotnet Tools**: `AndroidSdk.Tool` and `AppleDev.Tools` global tools
+6. **Logging**: Provisioning logs saved to `~/Library/Logs/maui-macos-provisioning/`
+
+### Usage
+
+Basic provisioning:
+```powershell
+pwsh ./provisioning/provision.ps1 -DotnetChannel 9.0
+```
+
+Dry run to preview changes:
+```powershell
+pwsh ./provisioning/provision.ps1 -DotnetChannel 10.0 -DryRun
+```
+
+Advanced options:
+```powershell
+pwsh ./provisioning/provision.ps1 `
+    -DotnetChannel 10.0 `
+    -WorkloadSetVersion "10.0.100-preview.1.123" `
+    -DotnetInstallDir "~/custom/.dotnet" `
+    -AndroidHome "~/custom/android" `
+    -SkipBrewUpdate `
+    -DryRun
+```
+
+### Key Features
+
+1. **Idempotent**: Safe to run multiple times - only installs missing components
+2. **Workload Alignment**: Automatically resolves workload set versions to match Docker images
+3. **Version Detection**: Inspects existing installations and upgrades when needed
+4. **Dry Run Support**: Preview all changes with `-DryRun` flag
+5. **Common Functions**: Reuses `common-functions.ps1` for workload resolution logic shared with Docker builds
+
+### Helper Functions
+
+The module includes several internal helper functions:
+- `Get-WorkloadInfo`: Resolves workload metadata from NuGet
+- `Ensure-BrewTap`: Manages Homebrew tap configuration
+- `Get-InstalledDotnetSdkVersions`: Detects installed .NET SDKs
+- `Get-AndroidInstalledPackages`: Lists Android SDK components
+- `Ensure-AndroidPackage`: Installs missing Android packages
+- `Invoke-ExternalCommand`: Wrapper for external command execution with dry run support
+
+### Integration with Docker Build System
+
+The macOS provisioning module shares code with the Docker build system:
+- Uses `common-functions.ps1` from the parent directory
+- Aligns workload versions using the same NuGet resolution logic
+- Ensures parity between containerized and native macOS environments
+
+### Testing
+
+After provisioning, validate the installation:
+```powershell
+# Check installations
+dotnet --info
+android sdk list --installed
+xcodebuild -version
+
+# Build and run tests
+pwsh ./test/build.ps1 -AndroidSdkApiLevel 35 -Load
+pwsh ./test/run.ps1 -AndroidSdkApiLevel 35
+```
+
+### .NET Version Support
+
+- **.NET 9.0**: Fully supported with stable workload sets
+- **.NET 10.0**: Preview/RC versions available with automatic prerelease detection
+
+### Environment Configuration
+
+The script sets up the current session PATH. For permanent configuration, add to your shell profile:
+```bash
+export DOTNET_ROOT="$HOME/.dotnet"
+export PATH="$HOME/.dotnet:$HOME/.dotnet/tools:$PATH"
+export ANDROID_HOME="$HOME/Library/Android/sdk"
+export ANDROID_SDK_ROOT="$HOME/Library/Android/sdk"
+```
+
+## Build Commands
+
+### Linting and Type Checking
+Currently, this is a PowerShell-based project without explicit lint/typecheck commands. PowerShell scripts are validated at runtime.
+
+### Testing
+Run provisioning in dry-run mode to validate:
+```powershell
+pwsh ./provisioning/provision.ps1 -DotnetChannel 10.0 -DryRun
+```

@@ -431,7 +431,7 @@ function Get-AndroidWorkloadInfo {
     $systemImageArch = $null
     
     if ($DockerPlatform.StartsWith("linux/")) {
-        $targetPlatform = "linux-x54"
+        $targetPlatform = "linux-x64"
     } elseif ($DockerPlatform.StartsWith("windows/")) {
         $targetPlatform = "win-x64"
     } else {
@@ -445,8 +445,17 @@ function Get-AndroidWorkloadInfo {
     if ($androidInfo) {
         # Extract JDK information
         if ($androidInfo.jdk) {
-            $androidJdkVersionRange = $androidInfo.jdk.version
-            $androidJdkRecommendedVersion = $androidInfo.jdk.recommendedVersion
+            if ($androidInfo.jdk -isnot [string]) {
+                $jdkObject = $androidInfo.jdk.PSObject
+                $versionProperty = $jdkObject.Properties['version']
+                if ($versionProperty) {
+                    $androidJdkVersionRange = $versionProperty.Value
+                }
+                $recommendedProperty = $jdkObject.Properties['recommendedVersion']
+                if ($recommendedProperty) {
+                    $androidJdkRecommendedVersion = $recommendedProperty.Value
+                }
+            }
             
             Write-Host "Found Android JDK info:"
             Write-Host "  Version Range: $androidJdkVersionRange"
@@ -476,7 +485,14 @@ function Get-AndroidWorkloadInfo {
                 }
                 
                 # Get recommended version if available
-                $recommendedVersion = $package.sdkPackage.recommendedVersion
+                $recommendedVersion = $null
+                if ($package.sdkPackage -isnot [string]) {
+                    $sdkPackageObject = $package.sdkPackage.PSObject
+                    $recommendedProperty = $sdkPackageObject.Properties['recommendedVersion']
+                    if ($recommendedProperty) {
+                        $recommendedVersion = $recommendedProperty.Value
+                    }
+                }
                 
                 # Create a structured object with detailed package info
                 if ($packageId) {
@@ -554,6 +570,121 @@ function Get-AndroidWorkloadInfo {
         AvdSystemImageArch = $systemImageArch
         SystemImagePackage = $systemImagePackage
         Packages = $androidSdkPackages
+    }
+}
+
+# Function to get iOS workload information from dependencies
+function Get-iOSWorkloadInfo {
+    param (
+        [PSObject]$Dependencies,
+        [string]$DockerPlatform
+    )
+
+    # Initialize variables to store extracted information
+    $xcodeVersionRange = $null
+    $xcodeRecommendedVersion = $null
+    $xcodeMajorVersion = $null
+    $iOSSdkVersion = $null
+
+    Write-Host "Processing dependency information for Microsoft.NET.Sdk.iOS"
+
+    # Extract iOS SDK information from the proper structure
+    $iOSInfo = $Dependencies."microsoft.net.sdk.ios"
+    if ($iOSInfo) {
+        # Extract Xcode information
+        if ($iOSInfo.xcode) {
+            if ($iOSInfo.xcode -isnot [string]) {
+                $xcodeObject = $iOSInfo.xcode.PSObject
+                $versionProperty = $xcodeObject.Properties['version']
+                if ($versionProperty) {
+                    $xcodeVersionRange = $versionProperty.Value
+                }
+                $recommendedProperty = $xcodeObject.Properties['recommendedVersion']
+                if ($recommendedProperty) {
+                    $xcodeRecommendedVersion = $recommendedProperty.Value
+                }
+            }
+
+            Write-Host "Found Xcode info:"
+            Write-Host "  Version Range: $xcodeVersionRange"
+            Write-Host "  Recommended Version: $xcodeRecommendedVersion"
+
+            # Extract major version from recommended version
+            if ($xcodeRecommendedVersion -match '^(\d+)') {
+                $xcodeMajorVersion = [int]$Matches[1]
+                Write-Host "  Extracted Xcode major version: $xcodeMajorVersion"
+            }
+        }
+
+        # Extract iOS SDK version
+        if ($iOSInfo.sdk -and $iOSInfo.sdk.version) {
+            $iOSSdkVersion = $iOSInfo.sdk.version
+            Write-Host "Found iOS SDK version: $iOSSdkVersion"
+        }
+    } else {
+        Write-Warning "No iOS workload information found in dependencies"
+        return $null
+    }
+
+    # Return structured information
+    return @{
+        XcodeVersionRange = $xcodeVersionRange
+        XcodeRecommendedVersion = $xcodeRecommendedVersion
+        XcodeMajorVersion = $xcodeMajorVersion
+        IOSSdkVersion = $iOSSdkVersion
+    }
+}
+
+function Get-TvOSWorkloadInfo {
+    param (
+        [PSObject]$Dependencies,
+        [string]$DockerPlatform
+    )
+
+    $xcodeVersionRange = $null
+    $xcodeRecommendedVersion = $null
+    $xcodeMajorVersion = $null
+    $tvOsSdkVersion = $null
+
+    Write-Host "Processing dependency information for Microsoft.NET.Sdk.tvOS"
+
+    $tvInfo = $Dependencies."microsoft.net.sdk.tvos"
+    if (-not $tvInfo) {
+        Write-Warning "No tvOS workload information found in dependencies"
+        return $null
+    }
+
+    if ($tvInfo.xcode -and $tvInfo.xcode -isnot [string]) {
+        $xcodeObject = $tvInfo.xcode.PSObject
+        $versionProperty = $xcodeObject.Properties['version']
+        if ($versionProperty) {
+            $xcodeVersionRange = $versionProperty.Value
+        }
+        $recommendedProperty = $xcodeObject.Properties['recommendedVersion']
+        if ($recommendedProperty) {
+            $xcodeRecommendedVersion = $recommendedProperty.Value
+        }
+
+        Write-Host "Found tvOS Xcode info:"
+        Write-Host "  Version Range: $xcodeVersionRange"
+        Write-Host "  Recommended Version: $xcodeRecommendedVersion"
+
+        if ($xcodeRecommendedVersion -match '^(\d+)') {
+            $xcodeMajorVersion = [int]$Matches[1]
+            Write-Host "  Extracted Xcode major version: $xcodeMajorVersion"
+        }
+    }
+
+    if ($tvInfo.sdk -and $tvInfo.sdk.version) {
+        $tvOsSdkVersion = $tvInfo.sdk.version
+        Write-Host "Found tvOS SDK version: $tvOsSdkVersion"
+    }
+
+    return @{
+        XcodeVersionRange = $xcodeVersionRange
+        XcodeRecommendedVersion = $xcodeRecommendedVersion
+        XcodeMajorVersion = $xcodeMajorVersion
+        TvOsSdkVersion = $tvOsSdkVersion
     }
 }
 
@@ -668,10 +799,11 @@ function Get-WorkloadInfo {
         [string]$WorkloadSetVersion = "",
         [switch]$IncludeAndroid,
         [switch]$IncludeiOS,
+        [switch]$IncludeTvOS,
         [switch]$IncludeMaui,
         [string]$DockerPlatform
     )
-    
+
     # Determine which workloads to include
     $workloadNames = @()
     if ($IncludeAndroid) {
@@ -680,13 +812,16 @@ function Get-WorkloadInfo {
     if ($IncludeiOS) {
         $workloadNames += "Microsoft.NET.Sdk.iOS"
     }
+    if ($IncludeTvOS) {
+        $workloadNames += "Microsoft.NET.Sdk.tvOS"
+    }
     if ($IncludeMaui) {
         $workloadNames += "Microsoft.NET.Sdk.Maui"
     }
     
     # If no specific workloads selected, include all supported ones
     if ($workloadNames.Count -eq 0) {
-        $workloadNames = @("Microsoft.NET.Sdk.Android", "Microsoft.NET.Sdk.iOS", "Microsoft.NET.Sdk.Maui")
+        $workloadNames = @("Microsoft.NET.Sdk.Android", "Microsoft.NET.Sdk.iOS", "Microsoft.NET.Sdk.tvOS", "Microsoft.NET.Sdk.Maui")
         Write-Host "No specific workloads selected, including all supported workloads."
     }
     
@@ -739,9 +874,14 @@ function Get-WorkloadInfo {
             }
             "Microsoft.NET.Sdk.iOS" {
                 if ($IncludeiOS) {
-                    # For future implementation - iOS-specific info parser
-                    # $iOSInfo = Get-iOSWorkloadInfo -Dependencies $workload.Dependencies -DockerPlatform $DockerPlatform
-                    # $workloadResult.Details = $iOSInfo
+                    $iOSInfo = Get-iOSWorkloadInfo -Dependencies $workload.Dependencies -DockerPlatform $DockerPlatform
+                    $workloadResult.Details = $iOSInfo
+                }
+            }
+            "Microsoft.NET.Sdk.tvOS" {
+                if ($IncludeTvOS) {
+                    $tvOsInfo = Get-TvOSWorkloadInfo -Dependencies $workload.Dependencies -DockerPlatform $DockerPlatform
+                    $workloadResult.Details = $tvOsInfo
                 }
             }
             "Microsoft.NET.Sdk.Maui" {
