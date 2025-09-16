@@ -373,17 +373,13 @@ jobs:
           $javaCheck = docker run --rm $imageName powershell -c 'if (Get-Command java -ErrorAction SilentlyContinue) { "Java is available" } else { "Java not found" }'
           if ($javaCheck -match "available") {
             Write-Host "✅ Java is installed and available"
-            # Try to get version for informational purposes (non-failing)
-            try {
-              $javaVersionOutput = docker run --rm $imageName powershell -c 'java -version 2>&1'
-              if ($javaVersionOutput) {
-                $versionLine = $javaVersionOutput | Select-String "openjdk|java" | Select-Object -First 1
-                if ($versionLine) {
-                  Write-Host "Java Version Info: $versionLine"
-                }
+            # Get version info - java -version outputs to stderr and returns exit code 1, which is normal
+            $javaVersionOutput = docker run --rm $imageName powershell -c 'java -version 2>&1; if ($LASTEXITCODE -eq 1 -or $LASTEXITCODE -eq 0) { exit 0 }'
+            if ($javaVersionOutput) {
+              $versionLine = $javaVersionOutput | Select-String "openjdk|java" | Select-Object -First 1
+              if ($versionLine) {
+                Write-Host "Java Version Info: $versionLine"
               }
-            } catch {
-              Write-Host "Java version info not available (but Java is installed)"
             }
           } else {
             Write-Error "❌ Java installation test failed: $javaCheck"
