@@ -137,7 +137,9 @@ $buildxArgs = @(
     "-t", "${DockerRepository}:${dockerTagBase}-dotnet${DotnetVersion}-workloads${dotnetCommandWorkloadSetVersion}-android${AndroidSdkApiLevel}-v${Version}"
 )
 
+# Add load flag if specified (only supported by buildx, and test images are Linux-only)
 if ($Load) {
+    Write-Host "Adding --load flag for Linux build"
     $buildxArgs += "--load"
 }
 

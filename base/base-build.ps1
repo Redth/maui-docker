@@ -101,9 +101,18 @@ $buildArgs = @(
     "--tag", $versionedTag
 )
 
-# Add load flag if specified
+# Add load flag if specified (only supported by buildx, not regular docker build)
+# Regular docker build automatically makes images available locally
 if ($Load) {
-    $buildArgs += @("--load")
+    # Only add --load flag for Linux builds where buildx might be available
+    # Windows runners typically use regular docker build which doesn't support --load
+    if ($DockerPlatform.StartsWith('linux/')) {
+        Write-Host "Adding --load flag for Linux build"
+        $buildArgs += @("--load")
+    } else {
+        Write-Host "Skipping --load flag for Windows build (not supported by regular docker build)"
+        # Windows builds use regular docker build - images are automatically loaded
+    }
 }
 
 # Change to the build context directory
