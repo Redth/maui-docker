@@ -1,6 +1,6 @@
-# MAUI macOS Provisioning
+# MAUI Host Provisioning
 
-The `provision.ps1` script bootstraps a local macOS host with the same developer tooling that ships in the Docker base images. It installs the .NET SDK, MAUI workloads, Android SDK components, and supporting dotnet tools so you can build and test MAUI applications directly on macOS hardware.
+The `provision.ps1` script bootstraps a developer workstation with the same tooling that ships in the Docker base images. It primarily targets macOS hosts (installing .NET, Android, and Apple tooling) but the module scaffolding also sets the stage for Windows and Linux support.
 
 ## Prerequisites
 - macOS 13 or newer with administrative privileges for Homebrew cask installs
