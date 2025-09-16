@@ -304,6 +304,23 @@ function Get-NuGetPackageContent {
 }
 
 # Function to convert NuGet-compatible version to dotnet workload CLI version format
+# 
+# IMPORTANT: .NET CLI uses different version formats than NuGet packages:
+#
+# For STABLE versions:
+#   NuGet Package: Microsoft.NET.Workloads.9.0.300 v9.305.0
+#   CLI Command:   dotnet workload install --version 9.0.305
+#   Conversion:    9.305.0 → 9.0.305 (major.0.patch[.additional])
+#
+# For PRERELEASE versions:  
+#   NuGet Package: Microsoft.NET.Workloads.10.0.100-rc.1 v10.100.0-rc.1.25458.2
+#   CLI Command:   dotnet workload install --version 10.0.100-rc.1.25458.2  
+#   Conversion:    10.100.0-rc.1.25458.2 → 10.0.100-rc.1.25458.2
+#
+# The key insight is that:
+# 1. Package IDs include prerelease suffix: microsoft.net.workloads.10.0.100-rc.1
+# 2. CLI versions keep prerelease suffix but convert base version: 10.0.100-rc.1.25458.2
+# 3. The CLI looks for the package with prerelease suffix in the name
 function Convert-ToWorkloadVersion {
     param (
         [string]$NuGetVersion
@@ -315,11 +332,37 @@ function Convert-ToWorkloadVersion {
     
     Write-Host "Converting NuGet version '$NuGetVersion' to dotnet workload CLI format"
     
-    # Split the version by dots
-    $parts = $NuGetVersion.Split('.')
+    # Check if this is a prerelease version (contains hyphen)
+    if ($NuGetVersion -match '^([^-]+)-(.+)$') {
+        $baseVersion = $matches[1]
+        $prereleaseIdentifier = $matches[2]
+        Write-Host "Detected prerelease version: base='$baseVersion' prerelease='$prereleaseIdentifier'"
+        
+        # Convert the base version and append prerelease
+        $convertedBase = Convert-BaseVersionToCliFormat -BaseVersion $baseVersion
+        $workloadVersion = "$convertedBase-$prereleaseIdentifier"
+        
+        Write-Host "Converted to: $workloadVersion"
+        return $workloadVersion
+    } else {
+        # This is a stable version - use existing logic
+        $workloadVersion = Convert-BaseVersionToCliFormat -BaseVersion $NuGetVersion
+        Write-Host "Converted to: $workloadVersion"
+        return $workloadVersion
+    }
+}
+
+# Helper function to convert base version from NuGet to CLI format
+function Convert-BaseVersionToCliFormat {
+    param (
+        [string]$BaseVersion
+    )
     
-    # NuGet versions are typically in format like 9.203.0 or 9.203.1
-    # Dotnet CLI expects format like 9.0.203 or 9.0.203.1
+    # Split the version by dots
+    $parts = $BaseVersion.Split('.')
+    
+    # NuGet versions are typically in format like 9.203.0 or 10.100.0
+    # Dotnet CLI expects format like 9.0.203 or 10.0.100
     if ($parts.Count -ge 3) {
         $major = $parts[0]
         $minor = "0"  # Always 0 in dotnet CLI format for the second component
@@ -339,13 +382,12 @@ function Convert-ToWorkloadVersion {
             $workloadVersion += ".$($parts[2])"
         }
         
-        Write-Host "Converted to: $workloadVersion"
         return $workloadVersion
     }
     
     # If the format doesn't match our expectations, return the original version
-    Write-Host "Could not convert version, using original: $NuGetVersion"
-    return $NuGetVersion
+    Write-Host "Could not convert version, using original: $BaseVersion"
+    return $BaseVersion
 }
 
 # Parse the version information (format is "version/sdk-band")
@@ -554,16 +596,8 @@ function Get-WorkloadSetInfo {
     }
 
     # Convert the WorkloadSetVersion to the format expected by dotnet workload CLI commands
-    # For prerelease versions, we may need to use the original NuGet version format
-    if ($WorkloadSetVersion -match '-') {
-        # This is a prerelease version - use the original NuGet format
-        $DotnetCommandWorkloadSetVersion = $WorkloadSetVersion
-        Write-Host "Using prerelease workload version (NuGet format): $DotnetCommandWorkloadSetVersion"
-    } else {
-        # This is a stable version - convert to CLI format
-        $DotnetCommandWorkloadSetVersion = Convert-ToWorkloadVersion -NuGetVersion $WorkloadSetVersion
-        Write-Host "Using dotnet workload CLI version: $DotnetCommandWorkloadSetVersion"
-    }
+    $DotnetCommandWorkloadSetVersion = Convert-ToWorkloadVersion -NuGetVersion $WorkloadSetVersion
+    Write-Host "Using dotnet workload CLI version: $DotnetCommandWorkloadSetVersion"
 
     # Download and parse the workload set JSON
     $workloadSetJsonContent = Get-NuGetPackageContent -PackageId $WorkloadSetId -Version $WorkloadSetVersion -FilePath "data/microsoft.net.workloads.workloadset.json"
