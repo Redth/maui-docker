@@ -113,6 +113,7 @@ if ($DockerPlatform.StartsWith('linux/')) {
         "--build-arg", "BASE_DOCKER_REPOSITORY=$BaseDockerRepository",
         "--build-arg", "GITHUB_ACTIONS_RUNNER_VERSION=2.323.0",
         "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion",
+        "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion-$Version",
         "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion",
         "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion-v$Version"
     )
@@ -129,6 +130,7 @@ if ($DockerPlatform.StartsWith('linux/')) {
         "--build-arg", "BASE_DOCKER_REPOSITORY=$BaseDockerRepository",
         "--build-arg", "GITHUB_ACTIONS_RUNNER_VERSION=2.323.0",
         "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion",
+        "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion-$Version",
         "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion",
         "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion-v$Version"
     )

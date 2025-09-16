@@ -108,6 +108,7 @@ Write-Host "Workload default API Level: $($androidDetails.ApiLevel) (will be ava
 Write-Host "Docker tags that will be created:"
 Write-Host "  ${DockerRepository}:${dockerTagBase}-android${AndroidSdkApiLevel}-v${Version}"
 Write-Host "  ${DockerRepository}:${dockerTagBase}-android${AndroidSdkApiLevel}"
+Write-Host "  ${DockerRepository}:${dockerTagBase}-android${AndroidSdkApiLevel}-dotnet${DotnetVersion}-${Version}"
 Write-Host "  ${DockerRepository}:${dockerTagBase}-dotnet${DotnetVersion}-android${AndroidSdkApiLevel}"
 Write-Host "  ${DockerRepository}:${dockerTagBase}-dotnet${DotnetVersion}-android${AndroidSdkApiLevel}-v${Version}"
 Write-Host "  ${DockerRepository}:${dockerTagBase}-dotnet${DotnetVersion}-workloads${dotnetCommandWorkloadSetVersion}-android${AndroidSdkApiLevel}"
@@ -129,6 +130,8 @@ $buildxArgs = @(
     # Original tags
     "-t", "${DockerRepository}:${dockerTagBase}-android${AndroidSdkApiLevel}-v${Version}",
     "-t", "${DockerRepository}:${dockerTagBase}-android${AndroidSdkApiLevel}",
+    # PR validation expected tag format
+    "-t", "${DockerRepository}:${dockerTagBase}-android${AndroidSdkApiLevel}-dotnet${DotnetVersion}-${Version}",
     # New tags with .NET version
     "-t", "${DockerRepository}:${dockerTagBase}-dotnet${DotnetVersion}-android${AndroidSdkApiLevel}",
     "-t", "${DockerRepository}:${dockerTagBase}-dotnet${DotnetVersion}-android${AndroidSdkApiLevel}-v${Version}",

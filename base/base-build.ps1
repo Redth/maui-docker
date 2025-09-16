@@ -77,12 +77,14 @@ Write-Host "Using build context: $contextPath"
 # Build multiple tags for consistency with runner images
 $primaryTag = "$DockerRepository`:$dockerTagBase-$Version"
 $dotnetTag = "$DockerRepository`:$dockerTagBase-dotnet$DotnetVersion"
+$dotnetVersionedTag = "$DockerRepository`:$dockerTagBase-dotnet$DotnetVersion-$Version"
 $workloadTag = "$DockerRepository`:$dockerTagBase-dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion"
 $versionedTag = "$DockerRepository`:$dockerTagBase-dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion-v$Version"
 
 Write-Host "Building Docker image with tags:"
 Write-Host "  Primary: $primaryTag"
 Write-Host "  .NET: $dotnetTag"
+Write-Host "  .NET Versioned: $dotnetVersionedTag"
 Write-Host "  Workloads: $workloadTag"
 Write-Host "  Versioned: $versionedTag"
 
@@ -97,6 +99,7 @@ $buildArgs = @(
     "--platform", $DockerPlatform,
     "--tag", $primaryTag,
     "--tag", $dotnetTag,
+    "--tag", $dotnetVersionedTag,
     "--tag", $workloadTag,
     "--tag", $versionedTag
 )
@@ -132,7 +135,7 @@ try {
     
     # Push if requested
     if ($Push) {
-        $tagsToPush = @($primaryTag, $dotnetTag, $workloadTag, $versionedTag)
+        $tagsToPush = @($primaryTag, $dotnetTag, $dotnetVersionedTag, $workloadTag, $versionedTag)
         
         foreach ($tag in $tagsToPush) {
             Write-Host "Pushing image: $tag"
