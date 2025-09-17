@@ -1,0 +1,118 @@
+# Cirrus CI configuration for Tart VM images
+# This file can be used to automate building and testing of Tart images
+
+env:
+  MACOS_VERSION: sequoia
+  DOTNET_CHANNEL: "10.0"
+  XCODE_VERSION: "16.4"
+
+# Build base image
+base_image_task:
+  name: Build Base Image
+  macos_instance:
+    image: ghcr.io/cirruslabs/macos-sequoia-base:latest
+  install_dependencies_script:
+    - brew install cirruslabs/cli/tart
+    - brew install packer
+  build_script:
+    - cd macos/tart
+    - pwsh ./scripts/build.ps1 -ImageType base -MacOSVersion $MACOS_VERSION -DryRun
+  test_script:
+    - pwsh ./scripts/test.ps1 -ImageName "maui-base-$MACOS_VERSION" -TestType basic
+  # Uncomment to actually build (remove -DryRun)
+  # build_script:
+  #   - pwsh ./scripts/build.ps1 -ImageType base -MacOSVersion $MACOS_VERSION
+
+# Build MAUI development image (depends on base)
+maui_image_task:
+  name: Build MAUI Image
+  depends_on: base_image
+  macos_instance:
+    image: ghcr.io/cirruslabs/macos-sequoia-base:latest
+  install_dependencies_script:
+    - brew install cirruslabs/cli/tart
+    - brew install packer
+  build_script:
+    - cd macos/tart
+    - pwsh ./scripts/build.ps1 -ImageType maui -MacOSVersion $MACOS_VERSION -DotnetChannel $DOTNET_CHANNEL -XcodeVersion $XCODE_VERSION -DryRun
+  test_script:
+    - pwsh ./scripts/test.ps1 -ImageName "maui-dev-$MACOS_VERSION" -TestType maui
+  # Uncomment to actually build
+  # build_script:
+  #   - pwsh ./scripts/build.ps1 -ImageType maui -MacOSVersion $MACOS_VERSION -DotnetChannel $DOTNET_CHANNEL -XcodeVersion $XCODE_VERSION
+
+# Build CI image (depends on MAUI)
+ci_image_task:
+  name: Build CI Image
+  depends_on: maui_image
+  macos_instance:
+    image: ghcr.io/cirruslabs/macos-sequoia-base:latest
+  install_dependencies_script:
+    - brew install cirruslabs/cli/tart
+    - brew install packer
+  build_script:
+    - cd macos/tart
+    - pwsh ./scripts/build.ps1 -ImageType ci -MacOSVersion $MACOS_VERSION -DryRun
+  test_script:
+    - pwsh ./scripts/test.ps1 -ImageName "maui-ci-$MACOS_VERSION" -TestType ci
+  # Uncomment to actually build
+  # build_script:
+  #   - pwsh ./scripts/build.ps1 -ImageType ci -MacOSVersion $MACOS_VERSION
+
+# Test MAUI application build using the built image
+test_maui_app_task:
+  name: Test MAUI App Build
+  depends_on: maui_image
+  macos_instance:
+    # This would use the custom built image in production
+    image: ghcr.io/cirruslabs/macos-sequoia-base:latest
+    # image: maui-dev-sequoia:latest
+  test_script:
+    - export PATH="$HOME/.dotnet:$HOME/.dotnet/tools:$PATH"
+    - export DOTNET_ROOT="$HOME/.dotnet"
+    - cd /tmp
+    - dotnet new maui -n TestApp
+    - cd TestApp
+    - dotnet restore
+    - dotnet build -c Release
+    - echo "MAUI app build test completed successfully"
+
+# Matrix build for multiple macOS versions (if needed)
+matrix_build_task:
+  name: Matrix Build
+  only_if: $CIRRUS_BRANCH == "main"
+  matrix:
+    - env:
+        MACOS_VERSION: sonoma
+    - env:
+        MACOS_VERSION: sequoia
+  macos_instance:
+    image: ghcr.io/cirruslabs/macos-${MACOS_VERSION}-base:latest
+  build_script:
+    - cd macos/tart
+    - pwsh ./scripts/build.ps1 -ImageType base -MacOSVersion $MACOS_VERSION -DryRun
+    - pwsh ./scripts/build.ps1 -ImageType maui -MacOSVersion $MACOS_VERSION -DotnetChannel $DOTNET_CHANNEL -DryRun
+
+# Scheduled monthly rebuild (first Saturday of the month)
+scheduled_rebuild_task:
+  name: Monthly Rebuild
+  only_if: $CIRRUS_CRON == "monthly"
+  macos_instance:
+    image: ghcr.io/cirruslabs/macos-sequoia-base:latest
+  install_dependencies_script:
+    - brew install cirruslabs/cli/tart
+    - brew install packer
+  build_all_script:
+    - cd macos/tart
+    - pwsh ./scripts/build.ps1 -ImageType base -MacOSVersion $MACOS_VERSION -Force
+    - pwsh ./scripts/build.ps1 -ImageType maui -MacOSVersion $MACOS_VERSION -DotnetChannel $DOTNET_CHANNEL -Force
+    - pwsh ./scripts/build.ps1 -ImageType ci -MacOSVersion $MACOS_VERSION -Force
+  test_all_script:
+    - pwsh ./scripts/test.ps1 -ImageName "maui-base-$MACOS_VERSION" -TestType basic
+    - pwsh ./scripts/test.ps1 -ImageName "maui-dev-$MACOS_VERSION" -TestType maui
+    - pwsh ./scripts/test.ps1 -ImageName "maui-ci-$MACOS_VERSION" -TestType ci
+  # Push to registry (configure as needed)
+  # push_script:
+  #   - pwsh ./scripts/build.ps1 -ImageType base -Push -Registry "your-registry.com"
+  #   - pwsh ./scripts/build.ps1 -ImageType maui -Push -Registry "your-registry.com"
+  #   - pwsh ./scripts/build.ps1 -ImageType ci -Push -Registry "your-registry.com"
