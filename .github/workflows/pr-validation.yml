@@ -134,77 +134,47 @@ jobs:
         
         Write-Host "Test subset: $testSubset"
         
+        function New-MatrixEntry {
+          param(
+            [string]$DotnetVersion,
+            [string]$Platform,
+            [string]$RunnerOs,
+            [string]$BuildRunner = 'false',
+            [string]$BuildTest = 'false',
+            [string]$AndroidApiLevel = ''
+          )
+
+          $entry = @{
+            dotnet_version = $DotnetVersion
+            platform       = $Platform
+            runner_os      = $RunnerOs
+            build_runner   = $BuildRunner
+            build_test     = $BuildTest
+          }
+
+          if ($AndroidApiLevel -ne '') {
+            $entry.android_api_level = $AndroidApiLevel
+          }
+
+          return $entry
+        }
+
         # Create matrix based on test subset
         $matrix = @()
-        
+
         if ($testSubset -eq "single-platform") {
-          # Only test one .NET version on Linux base
-          $matrix += @{
-            dotnet_version = $dotnetVersions[0]
-            image_type = "base"
-            platform = "linux"
-            runner_os = "ubuntu-latest"
-          }
+          $matrix += New-MatrixEntry -DotnetVersion $dotnetVersions[0] -Platform "linux" -RunnerOs "ubuntu-latest"
         }
         elseif ($testSubset -eq "base-only") {
-          # Test base images for all .NET versions and platforms
           foreach ($dotnetVersion in $dotnetVersions) {
-            $matrix += @{
-              dotnet_version = $dotnetVersion
-              image_type = "base"
-              platform = "linux"
-              runner_os = "ubuntu-latest"
-            }
-            $matrix += @{
-              dotnet_version = $dotnetVersion
-              image_type = "base"
-              platform = "windows"
-              runner_os = "windows-latest"
-            }
+            $matrix += New-MatrixEntry -DotnetVersion $dotnetVersion -Platform "linux" -RunnerOs "ubuntu-latest"
+            $matrix += New-MatrixEntry -DotnetVersion $dotnetVersion -Platform "windows" -RunnerOs "windows-latest"
           }
         }
         else {
-          # Test all image types (full test)
           foreach ($dotnetVersion in $dotnetVersions) {
-            # Base images
-            $matrix += @{
-              dotnet_version = $dotnetVersion
-              image_type = "base"
-              platform = "linux"
-              runner_os = "ubuntu-latest"
-            }
-            $matrix += @{
-              dotnet_version = $dotnetVersion
-              image_type = "base"
-              platform = "windows"
-              runner_os = "windows-latest"
-            }
-            
-            # Runner images (depend on base)
-            $matrix += @{
-              dotnet_version = $dotnetVersion
-              image_type = "runner"
-              platform = "linux"
-              runner_os = "ubuntu-latest"
-              depends_on = "base"
-            }
-            $matrix += @{
-              dotnet_version = $dotnetVersion
-              image_type = "runner"
-              platform = "windows"
-              runner_os = "windows-latest"
-              depends_on = "base"
-            }
-            
-            # Test image (Linux only, API 35)
-            $matrix += @{
-              dotnet_version = $dotnetVersion
-              image_type = "test"
-              platform = "linux"
-              runner_os = "ubuntu-latest"
-              depends_on = "base"
-              android_api_level = 35
-            }
+            $matrix += New-MatrixEntry -DotnetVersion $dotnetVersion -Platform "linux" -RunnerOs "ubuntu-latest" -BuildRunner 'true' -BuildTest 'true' -AndroidApiLevel '35'
+            $matrix += New-MatrixEntry -DotnetVersion $dotnetVersion -Platform "windows" -RunnerOs "windows-latest" -BuildRunner 'true'
           }
         }
         
@@ -215,7 +185,7 @@ jobs:
 
   # Step 2: Build Images (no push)
   build-images:
-    name: 🔨 Build ${{ matrix.image_type }} (${{ matrix.platform }}, .NET ${{ matrix.dotnet_version }})
+    name: 🔨 Build Images (${{ matrix.platform }}, .NET ${{ matrix.dotnet_version }})
     runs-on: ${{ matrix.runner_os }}
     needs: validate-workloads
     if: needs.validate-workloads.result == 'success'
@@ -231,87 +201,41 @@ jobs:
     - name: 💾 Setup Docker Buildx
       if: matrix.platform == 'linux'
       uses: docker/setup-buildx-action@v3
+      with:
+        driver: docker
 
-    - name: 🔨 Build ${{ matrix.image_type }} Image
+    - name: 🔨 Build base image
       shell: pwsh
       run: |
-        Write-Host "Building ${{ matrix.image_type }} image for .NET ${{ matrix.dotnet_version }} on ${{ matrix.platform }}"
-        
-        # Determine build script and parameters
+        Write-Host "Building base image for .NET ${{ matrix.dotnet_version }} on ${{ matrix.platform }}"
         $dockerPlatform = "${{ matrix.platform }}/amd64"
-        
-        if ("${{ matrix.image_type }}" -eq "base") {
-          $buildArgs = @{
-            DotNetVersion     = "${{ matrix.dotnet_version }}"
-            DockerRepository  = "${{ env.DOCKER_REPOSITORY_BASE }}"
-            DockerPlatform    = $dockerPlatform
-            Version           = "pr-test"
-            Push              = $false  # Never push in PR validation
-            Load              = $true   # Load locally for validation
-          }
-          ./base/base-build.ps1 @buildArgs
+        $buildArgs = @{
+          DotnetVersion    = "${{ matrix.dotnet_version }}"
+          DockerRepository = "${{ env.DOCKER_REPOSITORY_BASE }}"
+          DockerPlatform   = $dockerPlatform
+          Version          = "pr-test"
+          Push             = $false
+          Load             = $true
         }
-        elseif ("${{ matrix.image_type }}" -eq "runner") {
-          $buildArgs = @{
-            DotNetVersion         = "${{ matrix.dotnet_version }}"
-            DockerRepository      = "${{ env.DOCKER_REPOSITORY_RUNNER }}"
-            DockerPlatform        = $dockerPlatform
-            BaseDockerRepository  = "${{ env.DOCKER_REPOSITORY_BASE }}"
-            Version               = "pr-test"
-            Push                  = $false  # Never push in PR validation
-            Load                  = $true   # Load locally for validation
-          }
-          ./runner/runner-build.ps1 @buildArgs
-        }
-        elseif ("${{ matrix.image_type }}" -eq "test") {
-          $buildArgs = @{
-            DotnetVersion         = "${{ matrix.dotnet_version }}"
-            DockerRepository      = "${{ env.DOCKER_REPOSITORY_TEST }}"
-            BaseDockerRepository  = "${{ env.DOCKER_REPOSITORY_BASE }}"
-            DockerPlatform        = $dockerPlatform
-            AndroidApiLevel       = "${{ matrix.android_api_level }}"
-            Push                  = $false  # Never push in PR validation
-            Load                  = $true   # Load locally for validation
-          }
-          ./test/build.ps1 @buildArgs
-        }
+        ./base/base-build.ps1 @buildArgs
 
-    - name: 🔍 Validate Built Image
+    - name: 🔍 Validate base image
       shell: pwsh
       run: |
-        # Construct expected image name
-        $imageName = ""
-        if ("${{ matrix.image_type }}" -eq "base") {
-          $imageName = "${{ env.DOCKER_REPOSITORY_BASE }}:${{ matrix.platform }}-dotnet${{ matrix.dotnet_version }}-pr-test"
-        }
-        elseif ("${{ matrix.image_type }}" -eq "runner") {
-          $imageName = "${{ env.DOCKER_REPOSITORY_RUNNER }}:${{ matrix.platform }}-dotnet${{ matrix.dotnet_version }}-pr-test"
-        }
-        elseif ("${{ matrix.image_type }}" -eq "test") {
-          $imageName = "${{ env.DOCKER_REPOSITORY_TEST }}:appium-emulator-${{ matrix.platform }}-android${{ matrix.android_api_level }}-dotnet${{ matrix.dotnet_version }}-pr-test"
-        }
-        
+        $imageName = "${{ env.DOCKER_REPOSITORY_BASE }}:${{ matrix.platform }}-dotnet${{ matrix.dotnet_version }}-pr-test"
         Write-Host "Validating image: $imageName"
-        
-        # Check if image exists
         $imageExists = docker images --format "{{.Repository}}:{{.Tag}}" | Select-String -Pattern "$imageName"
-        
         if ($imageExists) {
-          Write-Host "✅ Image built successfully: $imageName"
-          
-          # Get image info
+          Write-Host "✅ Base image built successfully: $imageName"
           $imageInfo = docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedAt}}" --filter "reference=$imageName"
-          Write-Host "Image details:"
           Write-Host $imageInfo
         } else {
-          Write-Error "❌ Image not found: $imageName"
-          Write-Host "Available images:"
+          Write-Error "❌ Base image not found: $imageName"
           docker images
           exit 1
         }
 
-    - name: 🧪 Basic Image Test
-      if: matrix.image_type == 'base'
+    - name: 🧪 Basic image test
       shell: pwsh  
       run: |
         # Construct image name
@@ -387,8 +311,43 @@ jobs:
           }
         }
 
-    - name: 🧪 Runner Image Test  
-      if: matrix.image_type == 'runner'
+    - name: 🔨 Build runner image
+      if: matrix.build_runner == 'true'
+      shell: pwsh
+      run: |
+        Write-Host "Building runner image for .NET ${{ matrix.dotnet_version }} on ${{ matrix.platform }}"
+        $dockerPlatform = "${{ matrix.platform }}/amd64"
+        $buildArgs = @{
+          DotnetVersion        = "${{ matrix.dotnet_version }}"
+          DockerRepository     = "${{ env.DOCKER_REPOSITORY_RUNNER }}"
+          BaseDockerRepository = "${{ env.DOCKER_REPOSITORY_BASE }}"
+          DockerPlatform       = $dockerPlatform
+          Version              = "pr-test"
+          Push                 = $false
+          Load                 = $true
+        }
+        if ("${{ matrix.platform }}" -eq "linux") {
+          $buildArgs.UseBuildx = $false
+        }
+        ./runner/runner-build.ps1 @buildArgs
+
+    - name: 🔍 Validate runner image
+      if: matrix.build_runner == 'true'
+      shell: pwsh
+      run: |
+        $imageName = "${{ env.DOCKER_REPOSITORY_RUNNER }}:${{ matrix.platform }}-dotnet${{ matrix.dotnet_version }}-pr-test"
+        Write-Host "Validating image: $imageName"
+        $imageExists = docker images --format "{{.Repository}}:{{.Tag}}" | Select-String -Pattern "$imageName"
+        if ($imageExists) {
+          Write-Host "✅ Runner image built successfully: $imageName"
+        } else {
+          Write-Error "❌ Runner image not found: $imageName"
+          docker images
+          exit 1
+        }
+
+    - name: 🧪 Runner image test
+      if: matrix.build_runner == 'true'
       shell: pwsh
       run: |
         # Construct image name
@@ -415,8 +374,44 @@ jobs:
           }
         }
 
-    - name: 🧪 Test Image Test
-      if: matrix.image_type == 'test'
+    - name: 🔨 Build test image
+      if: matrix.build_test == 'true'
+      shell: pwsh
+      run: |
+        Write-Host "Building test image for .NET ${{ matrix.dotnet_version }} on ${{ matrix.platform }}"
+        $dockerPlatform = "${{ matrix.platform }}/amd64"
+        $buildArgs = @{
+          DotnetVersion        = "${{ matrix.dotnet_version }}"
+          DockerRepository     = "${{ env.DOCKER_REPOSITORY_TEST }}"
+          BaseDockerRepository = "${{ env.DOCKER_REPOSITORY_BASE }}"
+          DockerPlatform       = $dockerPlatform
+          AndroidSdkApiLevel   = "${{ matrix.android_api_level }}"
+          Version              = "pr-test"
+          Push                 = $false
+          Load                 = $true
+        }
+        if ("${{ matrix.platform }}" -eq "linux") {
+          $buildArgs.UseBuildx = $false
+        }
+        ./test/build.ps1 @buildArgs
+
+    - name: 🔍 Validate test image
+      if: matrix.build_test == 'true'
+      shell: pwsh
+      run: |
+        $imageName = "${{ env.DOCKER_REPOSITORY_TEST }}:appium-emulator-${{ matrix.platform }}-android${{ matrix.android_api_level }}-dotnet${{ matrix.dotnet_version }}-pr-test"
+        Write-Host "Validating image: $imageName"
+        $imageExists = docker images --format "{{.Repository}}:{{.Tag}}" | Select-String -Pattern "$imageName"
+        if ($imageExists) {
+          Write-Host "✅ Test image built successfully: $imageName"
+        } else {
+          Write-Error "❌ Test image not found: $imageName"
+          docker images
+          exit 1
+        }
+
+    - name: 🧪 Test image test
+      if: matrix.build_test == 'true'
       shell: pwsh
       run: |
         # Construct image name  

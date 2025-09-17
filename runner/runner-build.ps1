@@ -6,7 +6,8 @@ Param([String]$DotnetVersion="9.0",
     [String]$Version="latest",
     [Bool]$Load=$false,
     [Bool]$Push=$false,
-    [Bool]$BuildBase=$false)
+    [Bool]$BuildBase=$false,
+    [bool]$UseBuildx=$true)
 
 if ($DockerPlatform.StartsWith('linux/')) {
     $dockerTagBase = "linux"
@@ -106,25 +107,49 @@ if (-not $androidJdkMajorVersion) {
 
 # Define all buildx arguments in an array to avoid backtick issues
 if ($DockerPlatform.StartsWith('linux/')) {
-    $buildxArgs = @(
-        "buildx", "build",
-        "--platform", $DockerPlatform,
+    $useBuildx = $UseBuildx
+
+    $commonArgs = @(
         "--build-arg", "BASE_IMAGE_TAG=dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion",
         "--build-arg", "BASE_DOCKER_REPOSITORY=$BaseDockerRepository",
         "--build-arg", "GITHUB_ACTIONS_RUNNER_VERSION=2.323.0",
         "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion",
         "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion-$Version",
         "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion",
-        "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion-v$Version"
+        "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion-v$Version",
+        "-f", "Dockerfile",
+        "."
     )
-    
-    # Add load flag if specified (only supported by buildx)
-    if ($Load) {
-        Write-Host "Adding --load flag for Linux build"
-        $buildxArgs += "--load"
+
+    $dockerArgs = @()
+
+    if ($useBuildx) {
+        $dockerArgs += @("buildx", "build", "--platform", $DockerPlatform)
+        if ($Load) {
+            Write-Host "Adding --load flag for Linux build"
+            $dockerArgs += "--load"
+        }
+    } else {
+        $dockerArgs += "build"
+    }
+
+    $dockerArgs += $commonArgs
+    $buildContext = "$PSScriptRoot/linux"
+
+    Push-Location $buildContext
+    try {
+        Write-Host "Running docker $($dockerArgs -join ' ')"
+        & docker $dockerArgs
+        Write-Host "Docker build command completed with exit code: $LASTEXITCODE"
+        if ($LASTEXITCODE -ne 0) {
+            throw "Docker build failed with exit code $LASTEXITCODE"
+        }
+    }
+    finally {
+        Pop-Location
     }
 } else {
-    $buildxArgs = @(
+    $buildArgs = @(
         "build",
         "--build-arg", "BASE_IMAGE_TAG=dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion",
         "--build-arg", "BASE_DOCKER_REPOSITORY=$BaseDockerRepository",
@@ -132,41 +157,29 @@ if ($DockerPlatform.StartsWith('linux/')) {
         "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion",
         "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion-$Version",
         "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion",
-        "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion-v$Version"
+        "-t", "${DockerRepository}:${dockerTagBase}-dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion-v$Version",
+        "-f", "Dockerfile",
+        "."
     )
-    
-    # Skip --load flag for Windows build (not supported by regular docker build)
+
     if ($Load) {
         Write-Host "Skipping --load flag for Windows build (not supported by regular docker build)"
-        # Windows builds use regular docker build - images are automatically loaded
     }
-}
 
-
-if ($DockerPlatform.StartsWith('linux/')) {
-    $buildxArgs += "-f"
-    $buildxArgs += "Dockerfile"
-    $buildContext = "$PSScriptRoot/linux"
-} else {
-    $buildxArgs += "-f"
-    $buildxArgs += "Dockerfile"
     $buildContext = "$PSScriptRoot/windows"
-}
 
-$buildxArgs += "."
-
-# Change to the platform-specific directory for the build context
-Push-Location $buildContext
-
-try {
-    # Execute the docker command with all arguments
-    & docker $buildxArgs
-
-    # Output information for debugging
-    Write-Host "Docker buildx command completed with exit code: $LASTEXITCODE"
-} finally {
-    # Always return to original directory
-    Pop-Location
+    Push-Location $buildContext
+    try {
+        Write-Host "Running docker $($buildArgs -join ' ')"
+        & docker $buildArgs
+        Write-Host "Docker build command completed with exit code: $LASTEXITCODE"
+        if ($LASTEXITCODE -ne 0) {
+            throw "Docker build failed with exit code $LASTEXITCODE"
+        }
+    }
+    finally {
+        Pop-Location
+    }
 }
 
 

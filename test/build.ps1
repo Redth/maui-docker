@@ -8,7 +8,8 @@ Param(
     [String]$AppiumVersion="",
     [String]$AppiumUIAutomator2DriverVersion="",
     [Bool]$Load=$false,
-    [Bool]$Push=$false) 
+    [Bool]$Push=$false,
+    [bool]$UseBuildx=$true) 
 
 if ($DockerPlatform.StartsWith('linux/')) {
     $dockerTagBase = "appium-emulator-linux"
@@ -114,11 +115,8 @@ Write-Host "  ${DockerRepository}:${dockerTagBase}-dotnet${DotnetVersion}-androi
 Write-Host "  ${DockerRepository}:${dockerTagBase}-dotnet${DotnetVersion}-workloads${dotnetCommandWorkloadSetVersion}-android${AndroidSdkApiLevel}"
 Write-Host "  ${DockerRepository}:${dockerTagBase}-dotnet${DotnetVersion}-workloads${dotnetCommandWorkloadSetVersion}-android${AndroidSdkApiLevel}-v${Version}"
 
-# Define all buildx arguments in an array to avoid backtick issues
-$buildxArgs = @(
-    "buildx", "build",
-    "--platform", "linux/amd64", #"--platform", "linux/amd64,linux/arm64",
-    "-f", "Dockerfile",
+# Define docker arguments
+$commonArgs = @(
     "--build-arg", "ANDROID_SDK_API_LEVEL=$AndroidSdkApiLevel",
     "--build-arg", "ANDROID_SDK_BUILD_TOOLS_VERSION=$androidBuildToolsVersion",
     "--build-arg", "ANDROID_SDK_CMDLINE_TOOLS_VERSION=$androidCmdLineToolsVersion",
@@ -127,36 +125,45 @@ $buildxArgs = @(
     "--build-arg", "APPIUM_VERSION=$AppiumVersion",
     "--build-arg", "APPIUM_UIAUTOMATOR2_DRIVER_VERSION=$AppiumUIAutomator2DriverVersion",
     "--build-arg", "JAVA_JDK_MAJOR_VERSION=$androidJdkMajorVersion",
-    # Original tags
+    "--build-arg", "DOTNET_VERSION=$DotnetVersion",
+    "--build-arg", "ANDROID_SYSTEM_IMAGE_PACKAGE=$($androidDetails.SystemImagePackage.Id)",
+    # Tags
     "-t", "${DockerRepository}:${dockerTagBase}-android${AndroidSdkApiLevel}-v${Version}",
     "-t", "${DockerRepository}:${dockerTagBase}-android${AndroidSdkApiLevel}",
-    # PR validation expected tag format
     "-t", "${DockerRepository}:${dockerTagBase}-android${AndroidSdkApiLevel}-dotnet${DotnetVersion}-${Version}",
-    # New tags with .NET version
     "-t", "${DockerRepository}:${dockerTagBase}-dotnet${DotnetVersion}-android${AndroidSdkApiLevel}",
     "-t", "${DockerRepository}:${dockerTagBase}-dotnet${DotnetVersion}-android${AndroidSdkApiLevel}-v${Version}",
-    # New tags with .NET version and workload set version
     "-t", "${DockerRepository}:${dockerTagBase}-dotnet${DotnetVersion}-workloads${dotnetCommandWorkloadSetVersion}-android${AndroidSdkApiLevel}",
-    "-t", "${DockerRepository}:${dockerTagBase}-dotnet${DotnetVersion}-workloads${dotnetCommandWorkloadSetVersion}-android${AndroidSdkApiLevel}-v${Version}"
+    "-t", "${DockerRepository}:${dockerTagBase}-dotnet${DotnetVersion}-workloads${dotnetCommandWorkloadSetVersion}-android${AndroidSdkApiLevel}-v${Version}",
+    "-f", "Dockerfile",
+    "."
 )
 
-# Add load flag if specified (only supported by buildx, and test images are Linux-only)
-if ($Load) {
-    Write-Host "Adding --load flag for Linux build"
-    $buildxArgs += "--load"
+$dockerArgs = @()
+if ($UseBuildx) {
+    $dockerArgs += @("buildx", "build", "--platform", "linux/amd64")
+    if ($Load) {
+        Write-Host "Adding --load flag for Linux build"
+        $dockerArgs += "--load"
+    }
+} else {
+    $dockerArgs += "build"
 }
 
-$buildxArgs += "."
+$dockerArgs += $commonArgs
 
 # Change to the test directory to ensure correct build context
 Push-Location $PSScriptRoot
 
 try {
     # Execute the docker command with all arguments
-    & docker $buildxArgs
-
-    # Output information for debugging
-    Write-Host "Docker buildx command completed with exit code: $LASTEXITCODE"
+    Write-Host "Running docker $($dockerArgs -join ' ')"
+    & docker $dockerArgs
+    Write-Host "Docker build command completed with exit code: $LASTEXITCODE"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Docker build failed with exit code $LASTEXITCODE"
+        exit $LASTEXITCODE
+    }
 } finally {
     # Always return to original directory
     Pop-Location
