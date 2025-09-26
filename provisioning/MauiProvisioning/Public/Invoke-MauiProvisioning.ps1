@@ -168,7 +168,7 @@ function Invoke-MauiProvisioning {
 
     # Platform-specific package manager setup
     if (Test-IsMacOS) {
-        Ensure-BrewTap -Tap "homebrew/cask-versions"
+        # homebrew/cask-versions was deprecated - no longer needed
     }
 
     # Install JDK using cross-platform approach
@@ -206,7 +206,7 @@ function Invoke-MauiProvisioning {
             $runtimeVersion = $iOSDetails.IOSSdkVersion
             if ($runtimeVersion) {
                 $runtimeName = "iOS $runtimeVersion Simulator"
-                $runtimeSuccess = Ensure-IosSimulatorRuntime -Version $runtimeVersion -DisplayName $runtimeName
+                $runtimeSuccess = Ensure-SimulatorRuntime -Platform 'iOS' -Version $runtimeVersion -DisplayName $runtimeName
                 if (-not $runtimeSuccess) {
                     Write-Warning "Failed to ensure iOS simulator runtime $runtimeVersion"
                 }
@@ -216,7 +216,7 @@ function Invoke-MauiProvisioning {
 
             if ((-not $SkipTvOS) -and $tvOsDetails -and $tvOsDetails.TvOsSdkVersion) {
                 $tvRuntimeName = "tvOS $($tvOsDetails.TvOsSdkVersion) Simulator"
-                $tvRuntimeSuccess = Ensure-TvOsSimulatorRuntime -Version $tvOsDetails.TvOsSdkVersion -DisplayName $tvRuntimeName
+                $tvRuntimeSuccess = Ensure-SimulatorRuntime -Platform 'tvOS' -Version $tvOsDetails.TvOsSdkVersion -DisplayName $tvRuntimeName
                 if (-not $tvRuntimeSuccess) {
                     Write-Warning "Failed to ensure tvOS simulator runtime $($tvOsDetails.TvOsSdkVersion)"
                 }

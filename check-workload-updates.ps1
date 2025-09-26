@@ -227,19 +227,23 @@ try {
     $windowsTag = ""
     $latestVersion = ""
     $dotnetCommandWorkloadSetVersion = ""
+    $xcodeVersionRange = ""
+    $xcodeRecommendedVersion = ""
+    $xcodeMajorVersion = ""
+    $detailedWorkloadInfo = $null
     
     # Get comprehensive workload information
     # First try the simple approach
     Write-HostWithPrefix "Trying to find latest workload set..."
     $latestWorkloadSet = Find-LatestWorkloadSet -DotnetVersion $DotnetVersion
-    
+
     if ($latestWorkloadSet) {
         $latestVersion = $latestWorkloadSet.version
         $dotnetCommandWorkloadSetVersion = Convert-ToWorkloadVersion -NuGetVersion $latestVersion
         Write-HostWithPrefix "Using simple workload set approach"
     } else {
         Write-HostWithPrefix "Simple approach failed, trying comprehensive workload info..."
-        $workloadInfo = Get-WorkloadInfo -DotnetVersion $DotnetVersion -IncludeAndroid -DockerPlatform "linux/amd64"
+        $workloadInfo = Get-WorkloadInfo -DotnetVersion $DotnetVersion -IncludeAndroid -IncludeiOS -DockerPlatform "linux/amd64"
         
         if (-not $workloadInfo) {
             Write-Error "Failed to get workload information for .NET $DotnetVersion"
@@ -251,8 +255,9 @@ try {
         
         $latestVersion = $workloadInfo.WorkloadSetVersion
         $dotnetCommandWorkloadSetVersion = $workloadInfo.DotnetCommandWorkloadSetVersion
+        $detailedWorkloadInfo = $workloadInfo
     }
-    
+
     if (-not $latestVersion) {
         Write-Error "WorkloadSetVersion is null or empty in workload info"
         exit 1
@@ -265,7 +270,40 @@ try {
     
     Write-HostWithPrefix "Latest workload set version: $latestVersion"
     Write-HostWithPrefix "Dotnet command workload set version: $dotnetCommandWorkloadSetVersion"
-    
+
+    # Retrieve iOS workload dependency information for Xcode details
+    if (-not $detailedWorkloadInfo) {
+        try {
+            Write-HostWithPrefix "Retrieving iOS workload dependency information..."
+            $detailedWorkloadInfo = Get-WorkloadInfo -DotnetVersion $DotnetVersion -WorkloadSetVersion $latestVersion -IncludeiOS -DockerPlatform "linux/amd64"
+        } catch {
+            Write-HostWithPrefix "Warning: Failed to retrieve iOS workload information - $($_.Exception.Message)"
+        }
+    }
+
+    if ($detailedWorkloadInfo -and $detailedWorkloadInfo.Workloads -and $detailedWorkloadInfo.Workloads.ContainsKey("Microsoft.NET.Sdk.iOS")) {
+        $iosWorkload = $detailedWorkloadInfo.Workloads["Microsoft.NET.Sdk.iOS"]
+        if ($iosWorkload -and $iosWorkload.Details) {
+            if ($iosWorkload.Details.XcodeVersionRange) {
+                $xcodeVersionRange = $iosWorkload.Details.XcodeVersionRange
+            }
+            if ($iosWorkload.Details.XcodeRecommendedVersion) {
+                $xcodeRecommendedVersion = $iosWorkload.Details.XcodeRecommendedVersion
+            }
+            if ($null -ne $iosWorkload.Details.XcodeMajorVersion) {
+                $xcodeMajorVersion = $iosWorkload.Details.XcodeMajorVersion.ToString()
+            }
+
+            Write-HostWithPrefix "Xcode version range: $xcodeVersionRange"
+            Write-HostWithPrefix "Xcode recommended version: $xcodeRecommendedVersion"
+            Write-HostWithPrefix "Xcode major version: $xcodeMajorVersion"
+        } else {
+            Write-HostWithPrefix "Warning: iOS workload details were not available for Xcode information"
+        }
+    } else {
+        Write-HostWithPrefix "Warning: iOS workload information not found in workload set data"
+    }
+
     # Create expected tag patterns for both platforms
     $linuxTag = $TagPattern -replace '\{platform\}', 'linux' -replace '\{dotnet_version\}', $DotnetVersion -replace '\{workload_version\}', $dotnetCommandWorkloadSetVersion
     $windowsTag = $TagPattern -replace '\{platform\}', 'windows' -replace '\{dotnet_version\}', $DotnetVersion -replace '\{workload_version\}', $dotnetCommandWorkloadSetVersion
@@ -365,6 +403,9 @@ try {
         TriggerBuilds = $triggerBuilds
         NewVersion = $newVersion
         ForceBuild = $ForceBuild.IsPresent
+        XcodeVersionRange = $xcodeVersionRange
+        XcodeRecommendedVersion = $xcodeRecommendedVersion
+        XcodeMajorVersion = $xcodeMajorVersion
         ErrorMessage = $errorMessage
         DockerRepository = $DockerRepository
         TestDockerRepository = $TestDockerRepository
@@ -385,6 +426,9 @@ try {
         Write-GitHubOutput "has-windows-base-build" $hasWindowsBaseBuild.ToString().ToLower()
         Write-GitHubOutput "has-any-base-build" $hasAnyBaseBuild.ToString().ToLower()
         Write-GitHubOutput "force-build" $ForceBuild.IsPresent.ToString().ToLower()
+        Write-GitHubOutput "xcode-version-range" $xcodeVersionRange
+        Write-GitHubOutput "xcode-recommended-version" $xcodeRecommendedVersion
+        Write-GitHubOutput "xcode-major-version" $xcodeMajorVersion
         
         Write-HostWithPrefix "GitHub Actions outputs set:"
         Write-HostWithPrefix "  trigger-builds: $($triggerBuilds.ToString().ToLower())"
@@ -398,6 +442,9 @@ try {
         Write-HostWithPrefix "  has-windows-base-build: $($hasWindowsBaseBuild.ToString().ToLower())"
         Write-HostWithPrefix "  has-any-base-build: $($hasAnyBaseBuild.ToString().ToLower())"
         Write-HostWithPrefix "  force-build: $($ForceBuild.IsPresent.ToString().ToLower())"
+        Write-HostWithPrefix "  xcode-version-range: $xcodeVersionRange"
+        Write-HostWithPrefix "  xcode-recommended-version: $xcodeRecommendedVersion"
+        Write-HostWithPrefix "  xcode-major-version: $xcodeMajorVersion"
     } else {
         return $result
     }
@@ -411,7 +458,10 @@ try {
     if (-not $dotnetCommandWorkloadSetVersion) { $dotnetCommandWorkloadSetVersion = "unknown" }
     if (-not $linuxTag) { $linuxTag = "unknown" }
     if (-not $windowsTag) { $windowsTag = "unknown" }
-    
+    if (-not $xcodeVersionRange) { $xcodeVersionRange = "" }
+    if (-not $xcodeRecommendedVersion) { $xcodeRecommendedVersion = "" }
+    if (-not $xcodeMajorVersion) { $xcodeMajorVersion = "" }
+
     $result = [PSCustomObject]@{
         LatestVersion = $latestVersion
         DotnetCommandWorkloadSetVersion = $dotnetCommandWorkloadSetVersion
@@ -422,6 +472,9 @@ try {
         TriggerBuilds = $true
         NewVersion = $true
         ForceBuild = $ForceBuild.IsPresent
+        XcodeVersionRange = $xcodeVersionRange
+        XcodeRecommendedVersion = $xcodeRecommendedVersion
+        XcodeMajorVersion = $xcodeMajorVersion
         ErrorMessage = $_.Exception.Message
         DockerRepository = $DockerRepository
         DotnetVersion = $DotnetVersion
@@ -435,6 +488,9 @@ try {
         Write-GitHubOutput "linux-tag" $linuxTag
         Write-GitHubOutput "windows-tag" $windowsTag
         Write-GitHubOutput "force-build" $ForceBuild.IsPresent.ToString().ToLower()
+        Write-GitHubOutput "xcode-version-range" $xcodeVersionRange
+        Write-GitHubOutput "xcode-recommended-version" $xcodeRecommendedVersion
+        Write-GitHubOutput "xcode-major-version" $xcodeMajorVersion
     } else {
         return $result
     }

@@ -1,0 +1,63 @@
+{
+    "MacOSVersions": {
+        "sequoia": {
+            "FullName": "macOS Sequoia 15",
+            "MinXcodeVersion": "16.0",
+            "RecommendedXcodeVersion": "16.4"
+        },
+        "tahoe": {
+            "FullName": "macOS Tahoe 16",
+            "MinXcodeVersion": "26.0",
+            "RecommendedXcodeVersion": "26"
+        }
+    },
+    "DotnetChannels": {
+        "9.0": {
+            "Channel": "9.0",
+            "LTS": false,
+            "MinMacOSVersion": "sequoia",
+            "SupportedWorkloads": [
+                "maui",
+                "android",
+                "ios",
+                "maccatalyst",
+                "tvos",
+                "macos"
+            ],
+            "Targets": [
+                {
+                    "MacOSVersion": "sequoia",
+                    "XcodeVersion": "16.4"
+                },
+                {
+                    "MacOSVersion": "tahoe",
+                    "XcodeVersion": "26"
+                }
+            ]
+        },
+        "10.0": {
+            "Channel": "10.0",
+            "LTS": false,
+            "MinMacOSVersion": "sequoia",
+            "SupportedWorkloads": [
+                "maui",
+                "android",
+                "ios",
+                "maccatalyst",
+                "tvos",
+                "macos"
+            ],
+            "IsPreview": true,
+            "Targets": [
+                {
+                    "MacOSVersion": "sequoia",
+                    "XcodeVersion": "16.4"
+                },
+                {
+                    "MacOSVersion": "tahoe",
+                    "XcodeVersion": "26"
+                }
+            ]
+        }
+    }
+}

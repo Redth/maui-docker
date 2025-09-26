@@ -1,16 +1,12 @@
 {
-  "macos_version": "sequoia",
-  "dotnet_channel": "10.0",
-  "xcode_version": "16.4",
   "cpu_count": 4,
   "memory_gb": 8,
   "ssh_username": "admin",
   "ssh_password": "admin",
   "registry": "",
   "build_settings": {
-    "base_image_disk_size_gb": 100,
-    "maui_image_disk_size_gb": 120,
-    "ci_image_disk_size_gb": 100
+    "maui_image_disk_size_gb": 60,
+    "ci_image_disk_size_gb": 50
   },
   "optimization": {
     "disable_spotlight": true,
@@ -21,8 +17,7 @@
   "development_tools": {
     "visual_studio_code": true,
     "github_desktop": true,
-    "postman": true,
-    "docker": true
+    "postman": true
   },
   "ci_tools": {
     "github_cli": true,
