@@ -15,9 +15,7 @@ Tart VMs provide a Docker-like experience for macOS, allowing you to:
 ```
 tart/
 ├── templates/          # Packer templates for VM creation
-│   ├── base.pkr.hcl   # Base macOS image with homebrew
-│   ├── maui.pkr.hcl   # MAUI development image
-│   └── ci.pkr.hcl     # CI/CD runner image
+│   └── maui.pkr.hcl   # MAUI development and CI helper image
 ├── scripts/           # Build and automation scripts
 │   ├── build.ps1      # Main build script
 │   ├── provision.sh   # VM provisioning script
@@ -27,8 +25,9 @@ tart/
 │   ├── maui.yml       # MAUI tooling setup
 │   └── xcode.yml      # Xcode installation
 ├── config/            # Configuration files
-│   ├── variables.json # Build variables
-│   └── .cirrus.yml    # Cirrus CI configuration
+│   ├── platform-matrix.json # macOS/.NET/Xcode target matrix
+│   ├── variables.json      # Shared resource/tool defaults
+│   └── .cirrus.yml         # Optional Cirrus CI example
 └── README.md          # This file
 ```
 
@@ -51,14 +50,15 @@ tart/
 
 ## Quick Start
 
-### 1. Build Base Image
+### 1. Build MAUI Development Image (Sequoia)
 ```bash
-pwsh ./scripts/build.ps1 -ImageType base -MacOSVersion sequoia
+pwsh ./scripts/build.ps1 -ImageType maui -MacOSVersion sequoia -DotnetChannel 10.0
 ```
+> The script resolves `-XcodeVersion` from `config/platform-matrix.json` when you omit it.
 
-### 2. Build MAUI Development Image
+### 2. Build MAUI Preview Image (Tahoe + Xcode 26)
 ```bash
-pwsh ./scripts/build.ps1 -ImageType maui -DotnetChannel 10.0 -MacOSVersion sequoia
+pwsh ./scripts/build.ps1 -ImageType maui -MacOSVersion tahoe -DotnetChannel 10.0 -XcodeVersion 26
 ```
 
 ### 3. Run a VM
@@ -68,51 +68,46 @@ tart run maui-dev-sequoia
 
 ### 4. Test Built Image
 ```bash
-pwsh ./scripts/test.ps1 -ImageName maui-dev-sequoia
+pwsh ./scripts/test.ps1 -ImageName maui-dev-sequoia -TestType maui
 ```
+
+### 5. (Optional) Auto-register GitHub Actions runner
+When launching the VM, provide the same environment variables used by our Docker runner to trigger `/Users/admin/actions-runner/maui-runner.sh`:
+```bash
+GITHUB_ORG=your-org \
+GITHUB_TOKEN=ghp_xxx \
+tart run maui-dev-sequoia
+```
+Add `GITHUB_REPO`, `RUNNER_NAME`, or other runner flags as needed.
 
 ## Image Types
 
-### Base Image (`base.pkr.hcl`)
-- Clean macOS installation
-- Homebrew package manager
-- SSH access configured
-- Basic development tools
-
 ### MAUI Development Image (`maui.pkr.hcl`)
-- Extends base image
-- .NET SDK and MAUI workloads
-- Xcode and iOS simulators
-- Android SDK and tools
-- Visual Studio Code
-
-### CI/CD Runner Image (`ci.pkr.hcl`)
-- Extends MAUI image
-- GitHub Actions runner
-- Additional CI tools
-- Optimized for automation
+- Built directly on Cirrus Labs `macos-<version>-xcode:<tag>` VMs
+- Installs .NET SDK and MAUI workloads
+- Adds Xcode tooling, iOS simulators, Android SDK, and VS Code
+- Ships `/Users/admin/actions-runner/maui-runner.sh` for on-demand GitHub Actions registration driven by environment variables
 
 ## Configuration
 
-Edit `config/variables.json` to customize:
-- macOS version
-- .NET channel
-- Xcode version
-- Package versions
-- Resource allocation
+- `config/platform-matrix.json`: source of truth for macOS keys, the Xcode tags to install, and the .NET channel mappings used by `scripts/build.ps1`.
+- `config/variables.json`: shared resource and tooling defaults (CPU, memory, disk size, tool switches) that the Packer templates consume.
+- `config/.cirrus.yml`: optional Cirrus CI example; safe to ignore if you are not using their hosted service.
 
 ## Usage Examples
 
 ### Development Workflow
 ```bash
 # Build and start development environment
-pwsh ./scripts/build.ps1 -ImageType maui -DotnetChannel 10.0
+pwsh ./scripts/build.ps1 -ImageType maui -MacOSVersion sequoia -DotnetChannel 10.0
 tart run maui-dev-sequoia --dir project:/path/to/your/project
 
 # Inside VM - access project at /Volumes/My Shared Files/project
 cd "/Volumes/My Shared Files/project"
 dotnet build
 ```
+
+To target the Tahoe preview stack, add `-MacOSVersion tahoe -XcodeVersion 26` when calling `build.ps1`.
 
 ### CI/CD Integration
 ```yaml
@@ -129,10 +124,10 @@ task:
 
 ## Best Practices
 
-1. **Layered Approach**: Build images in layers (base → maui → ci)
-2. **Version Pinning**: Pin specific versions in templates
-3. **Resource Management**: Allocate appropriate CPU/memory
-4. **Directory Mounting**: Use `--dir` for project access
+1. **Version Pinning**: Pin specific versions in templates
+2. **Resource Management**: Allocate appropriate CPU/memory
+3. **Directory Mounting**: Use `--dir` for project access
+4. **Runner Configuration**: Export `GITHUB_ORG` and `GITHUB_TOKEN` before launching to auto-configure the bundled runner when needed
 5. **SSH Access**: Configure for automation and debugging
 6. **Image Registry**: Push to container registry for sharing
 

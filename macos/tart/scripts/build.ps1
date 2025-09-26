@@ -2,12 +2,17 @@
 
 Param(
     [Parameter(Mandatory=$true)]
-    [ValidateSet("base", "maui", "ci")]
+    [ValidateSet("maui", "ci")]
     [string]$ImageType,
 
+    [ValidateNotNullOrEmpty()]
     [string]$MacOSVersion = "sequoia",
+
+    [ValidateSet("9.0", "10.0")]
     [string]$DotnetChannel = "10.0",
-    [string]$XcodeVersion = "16.4",
+
+    [string]$WorkloadSetVersion = "",
+    [string]$XcodeVersion = "",
     [string]$ImageName = "",
     [string]$BaseImage = "",
     [string]$Registry = "",
@@ -21,23 +26,153 @@ Param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# Directory locations
 $scriptDir = Split-Path -Parent $PSScriptRoot
 $templatesDir = Join-Path $scriptDir "templates"
 $configDir = Join-Path $scriptDir "config"
 
 # Load configuration
-$configFile = Join-Path $configDir "variables.json"
-if (Test-Path $configFile) {
-    $config = Get-Content $configFile | ConvertFrom-Json
+$variablesFile = Join-Path $configDir "variables.json"
+if (Test-Path $variablesFile) {
+    $config = Get-Content $variablesFile -Raw | ConvertFrom-Json
 } else {
     $config = @{}
+}
+
+$matrixFile = Join-Path $configDir "platform-matrix.json"
+if (Test-Path $matrixFile) {
+    $script:PlatformMatrix = Get-Content $matrixFile -Raw | ConvertFrom-Json
+} else {
+    throw "Platform mapping file not found: $matrixFile"
+}
+
+# Version mapping and validation
+function Get-PlatformMatrixEntry {
+    param(
+        [pscustomobject]$Section,
+        [string]$Key
+    )
+
+    if (-not $Section -or -not $Key) {
+        return $null
+    }
+
+    $property = $Section.PSObject.Properties | Where-Object { $_.Name -eq $Key } | Select-Object -First 1
+    return $property.Value
+}
+
+function Get-MacOSVersionInfo {
+    param([string]$MacOSVersion)
+
+    $macOSInfo = Get-PlatformMatrixEntry -Section $script:PlatformMatrix.MacOSVersions -Key $MacOSVersion
+
+    if ($macOSInfo) {
+        return $macOSInfo
+    }
+
+    return [pscustomobject]@{
+        FullName = "macOS $MacOSVersion"
+        MinXcodeVersion = ""
+        RecommendedXcodeVersion = ""
+    }
+}
+
+function Get-DotnetChannelInfo {
+    param([string]$DotnetChannel)
+
+    $channelInfo = Get-PlatformMatrixEntry -Section $script:PlatformMatrix.DotnetChannels -Key $DotnetChannel
+
+    if (-not $channelInfo) {
+        $availableChannels = @()
+        if ($script:PlatformMatrix.DotnetChannels) {
+            $availableChannels = $script:PlatformMatrix.DotnetChannels.PSObject.Properties.Name
+        }
+        throw "Unsupported .NET channel: $DotnetChannel. Supported channels: $($availableChannels -join ', ')"
+    }
+
+    return $channelInfo
+}
+
+function Get-DotnetChannelTarget {
+    param(
+        [pscustomobject]$DotnetInfo,
+        [string]$MacOSVersion
+    )
+
+    if (-not $DotnetInfo -or -not $DotnetInfo.Targets) {
+        return $null
+    }
+
+    if ($MacOSVersion) {
+        $match = $DotnetInfo.Targets | Where-Object { $_.MacOSVersion -eq $MacOSVersion } | Select-Object -First 1
+        if ($match) {
+            return $match
+        }
+    }
+
+    return $DotnetInfo.Targets | Select-Object -First 1
+}
+
+function Test-VersionCompatibility {
+    param([string]$MacOSVersion, [string]$DotnetChannel)
+
+    $dotnetInfo = Get-DotnetChannelInfo -DotnetChannel $DotnetChannel
+
+    # Check minimum macOS version for .NET
+    $macOSVersionOrder = @('monterey', 'ventura', 'sonoma', 'sequoia', 'tahoe')
+    $normalizedMacOSVersion = $MacOSVersion.ToLowerInvariant()
+    $currentIndex = $macOSVersionOrder.IndexOf($normalizedMacOSVersion)
+    $minIndex = $macOSVersionOrder.IndexOf($dotnetInfo.MinMacOSVersion)
+
+    if ($currentIndex -eq -1) {
+        Write-Verbose "Skipping compatibility check for unrecognized macOS version '$MacOSVersion'."
+        return $true
+    }
+
+    if ($currentIndex -lt $minIndex) {
+        Write-Warning ".NET $DotnetChannel requires at least $($dotnetInfo.MinMacOSVersion), but you selected $MacOSVersion"
+        return $false
+    }
+
+    return $true
+}
+if ($MacOSVersion) {
+    $MacOSVersion = $MacOSVersion.Trim().ToLowerInvariant()
+}
+
+if ($DotnetChannel) {
+    $DotnetChannel = $DotnetChannel.Trim()
+}
+
+$dotnetInfo = $null
+if ($DotnetChannel) {
+    $dotnetInfo = Get-DotnetChannelInfo -DotnetChannel $DotnetChannel
+}
+
+$macOSInfo = $null
+if ($MacOSVersion) {
+    $macOSInfo = Get-MacOSVersionInfo -MacOSVersion $MacOSVersion
+}
+
+if (-not $PSBoundParameters.ContainsKey('XcodeVersion') -and -not $XcodeVersion) {
+    $target = Get-DotnetChannelTarget -DotnetInfo $dotnetInfo -MacOSVersion $MacOSVersion
+    if ($target) {
+        $XcodeVersion = $target.XcodeVersion
+    } elseif ($macOSInfo -and $macOSInfo.RecommendedXcodeVersion) {
+        $XcodeVersion = $macOSInfo.RecommendedXcodeVersion
+    } else {
+        throw 'Xcode version is required when no platform matrix recommendation is available.'
+    }
+}
+
+if ($MacOSVersion -and $DotnetChannel) {
+    [void](Test-VersionCompatibility -MacOSVersion $MacOSVersion -DotnetChannel $DotnetChannel)
 }
 
 # Set default image name if not provided
 if (-not $ImageName) {
     $suffix = if ($Registry) { "" } else { "-$MacOSVersion" }
     $ImageName = switch ($ImageType) {
-        "base" { "maui-base$suffix" }
         "maui" { "maui-dev$suffix" }
         "ci" { "maui-ci$suffix" }
     }
@@ -46,8 +181,12 @@ if (-not $ImageName) {
 # Set base image for layered builds
 if (-not $BaseImage) {
     $BaseImage = switch ($ImageType) {
-        "base" { "ghcr.io/cirruslabs/macos-$MacOSVersion-base:latest" }
-        "maui" { "maui-base-$MacOSVersion" }
+        "maui" {
+            if (-not $XcodeVersion) {
+                throw 'Xcode version is required for maui image builds.'
+            }
+            "ghcr.io/cirruslabs/macos-$MacOSVersion-xcode:$XcodeVersion"
+        }
         "ci" { "maui-dev-$MacOSVersion" }
     }
 }
@@ -56,6 +195,10 @@ Write-Host "Building Tart VM Image"
 Write-Host "===================="
 Write-Host "Image Type: $ImageType"
 Write-Host "macOS Version: $MacOSVersion"
+Write-Host ".NET Channel: $DotnetChannel"
+if ($XcodeVersion) {
+    Write-Host "Xcode Version: $XcodeVersion"
+}
 Write-Host "Image Name: $ImageName"
 Write-Host "Base Image: $BaseImage"
 Write-Host "CPU Count: $CPUCount"
@@ -93,7 +236,14 @@ function Start-TartBuild {
 
     $varArgs = @()
     foreach ($key in $Variables.Keys) {
-        $varArgs += "-var", "$key=$($Variables[$key])"
+        $value = $Variables[$key]
+        # Convert complex objects to JSON for Packer
+        if ($value -is [hashtable] -or $value -is [PSCustomObject]) {
+            $jsonValue = $value | ConvertTo-Json -Compress
+            $varArgs += "-var", "$key=$jsonValue"
+        } else {
+            $varArgs += "-var", "$key=$value"
+        }
     }
 
     if ($DryRun) {

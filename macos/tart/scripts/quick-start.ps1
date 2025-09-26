@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 
 Param(
-    [ValidateSet("base", "maui", "ci", "all")]
+    [ValidateSet("maui", "ci", "all")]
     [string]$BuildType = "maui",
     [string]$MacOSVersion = "sequoia",
     [string]$DotnetChannel = "10.0",
@@ -138,10 +138,9 @@ try {
     Test-Prerequisites
 
     $imagesToBuild = switch ($BuildType) {
-        "base" { @("base") }
-        "maui" { @("base", "maui") }
-        "ci" { @("base", "maui", "ci") }
-        "all" { @("base", "maui", "ci") }
+        "maui" { @("maui") }
+        "ci" { @("maui", "ci") }
+        "all" { @("maui", "ci") }
     }
 
     foreach ($imageType in $imagesToBuild) {
@@ -149,7 +148,6 @@ try {
 
         if ($Test -and -not $DryRun) {
             $imageName = switch ($imageType) {
-                "base" { "maui-base-$MacOSVersion" }
                 "maui" { "maui-dev-$MacOSVersion" }
                 "ci" { "maui-ci-$MacOSVersion" }
             }
@@ -159,7 +157,6 @@ try {
     }
 
     $finalImageName = switch ($BuildType) {
-        "base" { "maui-base-$MacOSVersion" }
         "maui" { "maui-dev-$MacOSVersion" }
         "ci" { "maui-ci-$MacOSVersion" }
         "all" { "maui-ci-$MacOSVersion" }
