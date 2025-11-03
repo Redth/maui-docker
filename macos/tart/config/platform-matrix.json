@@ -15,6 +15,9 @@
         "9.0": {
             "Channel": "9.0",
             "LTS": false,
+            "MacOSVersion": "tahoe",
+            "BaseXcodeVersion": "@sha256:49c83cf0989d5c3039b8f1a5c543aa25b2cd920784fdaf30be22e18e4edeaa95",
+            "AdditionalXcodeVersions": ["16.4"],
             "MinMacOSVersion": "sequoia",
             "SupportedWorkloads": [
                 "maui",
@@ -23,21 +26,14 @@
                 "maccatalyst",
                 "tvos",
                 "macos"
-            ],
-            "Targets": [
-                {
-                    "MacOSVersion": "sequoia",
-                    "XcodeVersion": "16.4"
-                },
-                {
-                    "MacOSVersion": "tahoe",
-                    "XcodeVersion": "26"
-                }
             ]
         },
         "10.0": {
             "Channel": "10.0",
             "LTS": false,
+            "MacOSVersion": "tahoe",
+            "BaseXcodeVersion": "@sha256:49c83cf0989d5c3039b8f1a5c543aa25b2cd920784fdaf30be22e18e4edeaa95",
+            "AdditionalXcodeVersions": ["16.4"],
             "MinMacOSVersion": "sequoia",
             "SupportedWorkloads": [
                 "maui",
@@ -47,17 +43,7 @@
                 "tvos",
                 "macos"
             ],
-            "IsPreview": true,
-            "Targets": [
-                {
-                    "MacOSVersion": "sequoia",
-                    "XcodeVersion": "16.4"
-                },
-                {
-                    "MacOSVersion": "tahoe",
-                    "XcodeVersion": "26"
-                }
-            ]
+            "IsPreview": true
         }
     }
 }

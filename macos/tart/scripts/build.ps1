@@ -6,13 +6,14 @@ Param(
     [string]$ImageType,
 
     [ValidateNotNullOrEmpty()]
-    [string]$MacOSVersion = "sequoia",
+    [string]$MacOSVersion = "",
 
     [ValidateSet("9.0", "10.0")]
     [string]$DotnetChannel = "10.0",
 
     [string]$WorkloadSetVersion = "",
-    [string]$XcodeVersion = "",
+    [string]$BaseXcodeVersion = "",
+    [string[]]$AdditionalXcodeVersions = @(),
     [string]$ImageName = "",
     [string]$BaseImage = "",
     [string]$Registry = "",
@@ -93,25 +94,6 @@ function Get-DotnetChannelInfo {
     return $channelInfo
 }
 
-function Get-DotnetChannelTarget {
-    param(
-        [pscustomobject]$DotnetInfo,
-        [string]$MacOSVersion
-    )
-
-    if (-not $DotnetInfo -or -not $DotnetInfo.Targets) {
-        return $null
-    }
-
-    if ($MacOSVersion) {
-        $match = $DotnetInfo.Targets | Where-Object { $_.MacOSVersion -eq $MacOSVersion } | Select-Object -First 1
-        if ($match) {
-            return $match
-        }
-    }
-
-    return $DotnetInfo.Targets | Select-Object -First 1
-}
 
 function Test-VersionCompatibility {
     param([string]$MacOSVersion, [string]$DotnetChannel)
@@ -136,33 +118,50 @@ function Test-VersionCompatibility {
 
     return $true
 }
-if ($MacOSVersion) {
-    $MacOSVersion = $MacOSVersion.Trim().ToLowerInvariant()
-}
-
+# Normalize inputs
 if ($DotnetChannel) {
     $DotnetChannel = $DotnetChannel.Trim()
 }
 
+# Load .NET channel info
 $dotnetInfo = $null
 if ($DotnetChannel) {
     $dotnetInfo = Get-DotnetChannelInfo -DotnetChannel $DotnetChannel
 }
 
+# Auto-resolve macOS version from .NET channel if not explicitly specified
+if (-not $PSBoundParameters.ContainsKey('MacOSVersion') -or -not $MacOSVersion) {
+    if ($dotnetInfo -and $dotnetInfo.MacOSVersion) {
+        $MacOSVersion = $dotnetInfo.MacOSVersion
+    }
+}
+
+# Normalize macOS version
+if ($MacOSVersion) {
+    $MacOSVersion = $MacOSVersion.Trim().ToLowerInvariant()
+}
+
+# Load macOS version info
 $macOSInfo = $null
 if ($MacOSVersion) {
     $macOSInfo = Get-MacOSVersionInfo -MacOSVersion $MacOSVersion
 }
 
-if (-not $PSBoundParameters.ContainsKey('XcodeVersion') -and -not $XcodeVersion) {
-    $target = Get-DotnetChannelTarget -DotnetInfo $dotnetInfo -MacOSVersion $MacOSVersion
-    if ($target) {
-        $XcodeVersion = $target.XcodeVersion
+# Auto-resolve Xcode versions if not explicitly specified
+if (-not $PSBoundParameters.ContainsKey('BaseXcodeVersion') -and -not $BaseXcodeVersion) {
+    # Use Xcode version from .NET channel info if available
+    if ($dotnetInfo -and $dotnetInfo.BaseXcodeVersion) {
+        $BaseXcodeVersion = $dotnetInfo.BaseXcodeVersion
     } elseif ($macOSInfo -and $macOSInfo.RecommendedXcodeVersion) {
-        $XcodeVersion = $macOSInfo.RecommendedXcodeVersion
+        $BaseXcodeVersion = $macOSInfo.RecommendedXcodeVersion
     } else {
-        throw 'Xcode version is required when no platform matrix recommendation is available.'
+        throw 'Base Xcode version is required when no platform matrix recommendation is available.'
     }
+}
+
+# Auto-resolve additional Xcode versions if not explicitly specified
+if (-not $PSBoundParameters.ContainsKey('AdditionalXcodeVersions') -and $dotnetInfo -and $dotnetInfo.AdditionalXcodeVersions) {
+    $AdditionalXcodeVersions = $dotnetInfo.AdditionalXcodeVersions
 }
 
 if ($MacOSVersion -and $DotnetChannel) {
@@ -171,7 +170,9 @@ if ($MacOSVersion -and $DotnetChannel) {
 
 # Set default image name if not provided
 if (-not $ImageName) {
-    $suffix = if ($Registry) { "" } else { "-$MacOSVersion" }
+    # Use .NET channel in name to differentiate between versions
+    $dotnetSuffix = if ($DotnetChannel) { "-dotnet$($DotnetChannel)" } else { "" }
+    $suffix = if ($Registry) { $dotnetSuffix } else { "-$MacOSVersion$dotnetSuffix" }
     $ImageName = switch ($ImageType) {
         "maui" { "maui-dev$suffix" }
         "ci" { "maui-ci$suffix" }
@@ -182,10 +183,15 @@ if (-not $ImageName) {
 if (-not $BaseImage) {
     $BaseImage = switch ($ImageType) {
         "maui" {
-            if (-not $XcodeVersion) {
-                throw 'Xcode version is required for maui image builds.'
+            if (-not $BaseXcodeVersion) {
+                throw 'Base Xcode version is required for maui image builds.'
             }
-            "ghcr.io/cirruslabs/macos-$MacOSVersion-xcode:$XcodeVersion"
+            # Handle digest format (@sha256:...) vs tag format (26)
+            if ($BaseXcodeVersion.StartsWith("@")) {
+                "ghcr.io/cirruslabs/macos-$MacOSVersion-xcode$BaseXcodeVersion"
+            } else {
+                "ghcr.io/cirruslabs/macos-$MacOSVersion-xcode:$BaseXcodeVersion"
+            }
         }
         "ci" { "maui-dev-$MacOSVersion" }
     }
@@ -196,8 +202,11 @@ Write-Host "===================="
 Write-Host "Image Type: $ImageType"
 Write-Host "macOS Version: $MacOSVersion"
 Write-Host ".NET Channel: $DotnetChannel"
-if ($XcodeVersion) {
-    Write-Host "Xcode Version: $XcodeVersion"
+if ($BaseXcodeVersion) {
+    Write-Host "Base Xcode Version: $BaseXcodeVersion"
+}
+if ($AdditionalXcodeVersions -and $AdditionalXcodeVersions.Count -gt 0) {
+    Write-Host "Additional Xcode Versions: $($AdditionalXcodeVersions -join ', ')"
 }
 Write-Host "Image Name: $ImageName"
 Write-Host "Base Image: $BaseImage"
@@ -309,7 +318,8 @@ try {
         "base_image" = $BaseImage
         "macos_version" = $MacOSVersion
         "dotnet_channel" = $DotnetChannel
-        "xcode_version" = $XcodeVersion
+        "base_xcode_version" = $BaseXcodeVersion
+        "additional_xcode_versions" = ($AdditionalXcodeVersions -join ",")
         "cpu_count" = $CPUCount
         "memory_gb" = $MemoryGB
     }

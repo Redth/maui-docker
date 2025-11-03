@@ -54,11 +54,12 @@ tart/
 ```bash
 pwsh ./scripts/build.ps1 -ImageType maui -MacOSVersion sequoia -DotnetChannel 10.0
 ```
-> The script resolves `-XcodeVersion` from `config/platform-matrix.json` when you omit it.
+> The script resolves `-BaseXcodeVersion` from `config/platform-matrix.json` when you omit it.
 
 ### 2. Build MAUI Preview Image (Tahoe + Xcode 26)
 ```bash
-pwsh ./scripts/build.ps1 -ImageType maui -MacOSVersion tahoe -DotnetChannel 10.0 -XcodeVersion 26
+# Uses pinned SHA256 digest from platform-matrix.json
+pwsh ./scripts/build.ps1 -ImageType maui -MacOSVersion tahoe -DotnetChannel 10.0
 ```
 
 ### 3. Run a VM
@@ -107,7 +108,7 @@ cd "/Volumes/My Shared Files/project"
 dotnet build
 ```
 
-To target the Tahoe preview stack, add `-MacOSVersion tahoe -XcodeVersion 26` when calling `build.ps1`.
+To target the Tahoe preview stack, use `-MacOSVersion tahoe` when calling `build.ps1`. The base Xcode version is pinned via SHA256 digest in `platform-matrix.json`.
 
 ### CI/CD Integration
 ```yaml
