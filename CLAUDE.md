@@ -4,11 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Overview
 
-This repository builds Docker images for .NET MAUI development, testing, and CI/CD. It provides three main types of Docker images:
+This repository builds Docker images for .NET MAUI development, testing, and CI/CD. It provides four main types of Docker images:
 
-1. **Base Images** (`base/`) - MAUI development environment without GitHub Actions runner
-2. **Runner Images** (`runner/`) - Base images + GitHub Actions runner for CI/CD
-3. **Test Images** (`test/`) - Ready-to-use testing environment with Appium and Android Emulator
+1. **Base Images** (`base/`) - MAUI development environment without CI runner
+2. **GitHub Runner Images** (`runner/`) - Base images + GitHub Actions runner for CI/CD
+3. **Gitea Runner Images** (`gitea-runner/`) - Base images + Gitea Actions runner for CI/CD
+4. **Test Images** (`test/`) - Ready-to-use testing environment with Appium and Android Emulator
 
 ## Build Commands
 
@@ -27,13 +28,22 @@ This repository builds Docker images for .NET MAUI development, testing, and CI/
 ./base/base-build.ps1 -DockerPlatform "windows/amd64" -DockerRepository "your-repo/maui-build"
 ```
 
-### Building Runner Images
+### Building GitHub Runner Images
 ```powershell
-# Build runner images (depend on base images)
+# Build GitHub runner images (depend on base images)
 ./runner/runner-build.ps1 -DotnetVersion "9.0" -DockerRepository "your-repo/maui-actions-runner" -DockerPlatform "linux/amd64"
 ./runner/runner-build.ps1 -DotnetVersion "10.0" -DockerRepository "your-repo/maui-actions-runner" -DockerPlatform "linux/amd64"
 ./runner/runner-build.ps1 -DotnetVersion "9.0" -DockerRepository "your-repo/maui-actions-runner" -DockerPlatform "windows/amd64"
 ./runner/runner-build.ps1 -DotnetVersion "10.0" -DockerRepository "your-repo/maui-actions-runner" -DockerPlatform "windows/amd64"
+```
+
+### Building Gitea Runner Images
+```powershell
+# Build Gitea runner images (depend on base images)
+./gitea-runner/gitea-runner-build.ps1 -DotnetVersion "9.0" -DockerRepository "your-repo/maui-gitea-runner" -DockerPlatform "linux/amd64"
+./gitea-runner/gitea-runner-build.ps1 -DotnetVersion "10.0" -DockerRepository "your-repo/maui-gitea-runner" -DockerPlatform "linux/amd64"
+./gitea-runner/gitea-runner-build.ps1 -DotnetVersion "9.0" -DockerRepository "your-repo/maui-gitea-runner" -DockerPlatform "windows/amd64"
+./gitea-runner/gitea-runner-build.ps1 -DotnetVersion "10.0" -DockerRepository "your-repo/maui-gitea-runner" -DockerPlatform "windows/amd64"
 ```
 
 ### Building Test Images
@@ -79,10 +89,11 @@ Key functions:
 ### Docker Image Hierarchy
 ```
 Base Image (MAUI Dev Environment)
-    ↓
-Runner Image (Base + GitHub Actions Runner)
-    ↓
-Test Image (Runner + Appium + Android Emulator)
+    ├─→ GitHub Runner Image (Base + GitHub Actions Runner)
+    │       ↓
+    │   Test Image (Runner + Appium + Android Emulator)
+    │
+    └─→ Gitea Runner Image (Base + Gitea Actions Runner)
 ```
 
 ### Platform Support
@@ -138,11 +149,29 @@ The repository includes a dedicated PR validation workflow (`pr-validation.yml`)
 
 ## Key Environment Variables
 
-For runner images:
+For GitHub runner images:
 - `GITHUB_TOKEN` - Required for runner registration
 - `GITHUB_ORG` - GitHub organization
 - `GITHUB_REPO` - Repository name (optional, defaults to org-level)
 - `RUNNER_NAME` - Custom runner name
+- `RUNNER_NAME_PREFIX` - Prefix for auto-generated runner names (default: "maui-runner")
+- `RANDOM_RUNNER_SUFFIX` - Add random suffix to runner name (default: "true")
+- `RUNNER_WORKDIR` - Runner work directory
+- `RUNNER_GROUP` - Runner group (default: "Default")
+- `LABELS` - Custom labels for the runner
+- `EPHEMERAL` - Enable ephemeral mode (runner deleted after one job)
+- `DISABLE_AUTO_UPDATE` - Disable automatic runner updates
+- `NO_DEFAULT_LABELS` - Remove default labels
+- `INIT_PWSH_SCRIPT` - Custom PowerShell initialization script
+- `INIT_BASH_SCRIPT` - Custom bash initialization script (Linux only)
+
+For Gitea runner images:
+- `GITEA_INSTANCE_URL` - Required - Gitea instance URL (e.g., "https://gitea.example.com")
+- `GITEA_RUNNER_TOKEN` - Required - Runner registration token from Gitea
+- `GITEA_RUNNER_NAME` - Custom runner name (auto-generated if not set)
+- `GITEA_RUNNER_NAME_PREFIX` - Prefix for auto-generated runner names (default: "gitea-runner")
+- `RANDOM_RUNNER_SUFFIX` - Add random suffix to runner name (default: "true")
+- `GITEA_RUNNER_LABELS` - Comma-separated labels (default: "maui,linux,amd64" or "maui,windows,amd64")
 - `INIT_PWSH_SCRIPT` - Custom PowerShell initialization script
 - `INIT_BASH_SCRIPT` - Custom bash initialization script (Linux only)
 
