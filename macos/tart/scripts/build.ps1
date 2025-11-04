@@ -318,6 +318,7 @@ try {
         "base_image" = $BaseImage
         "macos_version" = $MacOSVersion
         "dotnet_channel" = $DotnetChannel
+        "workload_set_version" = $WorkloadSetVersion
         "base_xcode_version" = $BaseXcodeVersion
         "additional_xcode_versions" = ($AdditionalXcodeVersions -join ",")
         "cpu_count" = $CPUCount

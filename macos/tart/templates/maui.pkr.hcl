@@ -31,6 +31,12 @@ variable "dotnet_channel" {
   default     = "10.0"
 }
 
+variable "workload_set_version" {
+  type        = string
+  description = "Specific workload set version (e.g., 10.0.100-rc.1.24557.12). Leave empty for auto-detect."
+  default     = ""
+}
+
 variable "base_xcode_version" {
   type        = string
   description = "Base Xcode version from upstream image (use @sha256:... for pinning to specific digest)"
@@ -190,19 +196,31 @@ build {
       "cp -r /tmp/MauiProvisioning/* /tmp/provisioning/MauiProvisioning/",
       "cd /tmp/provisioning",
       "echo 'Starting MAUI provisioning module...'",
-      "if pwsh -c 'Import-Module ./MauiProvisioning/MauiProvisioning.psd1 -Force; Invoke-MauiProvisioning -DotnetChannel ${var.dotnet_channel}'; then",
-      "  echo 'MAUI provisioning completed successfully'",
-      "  # Verify dotnet was installed",
-      "  if [ -f /Users/admin/.dotnet/dotnet ] || [ -f /usr/local/share/dotnet/dotnet ]; then",
-      "    echo 'Dotnet installation verified'",
+      "WORKLOAD_SET_VERSION='${var.workload_set_version}'",
+      "if [ -n \"$$WORKLOAD_SET_VERSION\" ]; then",
+      "  echo \"Using specific workload set version: $$WORKLOAD_SET_VERSION\"",
+      "  if pwsh -c \"Import-Module ./MauiProvisioning/MauiProvisioning.psd1 -Force; Invoke-MauiProvisioning -DotnetChannel ${var.dotnet_channel} -WorkloadSetVersion '$$WORKLOAD_SET_VERSION'\"; then",
+      "    echo 'MAUI provisioning completed successfully'",
       "  else",
-      "    echo 'WARNING: dotnet binary not found after provisioning'",
-      "    ls -la /Users/admin/.dotnet/ 2>/dev/null || echo '/Users/admin/.dotnet does not exist'",
-      "    ls -la /usr/local/share/dotnet/ 2>/dev/null || echo '/usr/local/share/dotnet does not exist'",
+      "    echo 'ERROR: MAUI provisioning failed'",
+      "    exit 1",
       "  fi",
       "else",
-      "  echo 'ERROR: MAUI provisioning failed'",
-      "  exit 1",
+      "  echo \"No workload set version specified - will auto-detect latest\"",
+      "  if pwsh -c 'Import-Module ./MauiProvisioning/MauiProvisioning.psd1 -Force; Invoke-MauiProvisioning -DotnetChannel ${var.dotnet_channel}'; then",
+      "    echo 'MAUI provisioning completed successfully'",
+      "  else",
+      "    echo 'ERROR: MAUI provisioning failed'",
+      "    exit 1",
+      "  fi",
+      "fi",
+      "# Verify dotnet was installed",
+      "if [ -f /Users/admin/.dotnet/dotnet ] || [ -f /usr/local/share/dotnet/dotnet ]; then",
+      "  echo 'Dotnet installation verified'",
+      "else",
+      "  echo 'WARNING: dotnet binary not found after provisioning'",
+      "  ls -la /Users/admin/.dotnet/ 2>/dev/null || echo '/Users/admin/.dotnet does not exist'",
+      "  ls -la /usr/local/share/dotnet/ 2>/dev/null || echo '/usr/local/share/dotnet does not exist'",
       "fi"
     ]
     timeout = "30m"

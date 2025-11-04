@@ -1,0 +1,195 @@
+name: 🍎 Build Tart VM Images
+
+on:
+  workflow_dispatch:
+    inputs:
+      dotnet_channel:
+        description: '.NET channel to build (9.0 or 10.0)'
+        required: true
+        type: choice
+        options:
+          - '9.0'
+          - '10.0'
+        default: '10.0'
+      workload_set_version:
+        description: 'Specific workload set version (e.g., 10.0.100-rc.1.24557.12). Leave empty for auto-detect.'
+        required: false
+        type: string
+      image_type:
+        description: 'Image type to build'
+        required: true
+        type: choice
+        options:
+          - 'maui'
+        default: 'maui'
+      force_build:
+        description: 'Force rebuild even if image exists'
+        required: false
+        default: false
+        type: boolean
+      push_to_registry:
+        description: 'Push to registry after build'
+        required: false
+        default: false
+        type: boolean
+      registry:
+        description: 'Docker registry for pushing images (optional)'
+        required: false
+        type: string
+
+env:
+  DOTNET_CHANNEL: ${{ inputs.dotnet_channel || '10.0' }}
+  IMAGE_TYPE: ${{ inputs.image_type || 'maui' }}
+  WORKLOAD_SET_VERSION: ${{ inputs.workload_set_version }}
+
+jobs:
+  build-tart-macos:
+    name: 🍎 Build Tart VM (.NET ${{ inputs.dotnet_channel || '10.0' }})
+    runs-on: macos-latest
+
+    steps:
+    - name: 🛒 Checkout
+      uses: actions/checkout@v4
+
+    - name: 🔧 Install Prerequisites
+      run: |
+        echo "Installing Homebrew packages..."
+        brew install cirruslabs/cli/tart
+        brew install packer
+        brew install jq
+
+        echo "Verifying installations..."
+        tart --version
+        packer --version
+        jq --version
+        pwsh --version
+
+    - name: 🧹 Clean Up Space
+      run: |
+        echo "Checking available disk space..."
+        df -h
+
+        echo "Cleaning up existing Tart images..."
+        tart list || true
+
+        # Remove any existing build artifacts to free up space
+        brew cleanup || true
+
+        echo "Disk space after cleanup:"
+        df -h
+
+    - name: 🔧 Build Tart VM Image
+      shell: pwsh
+      run: |
+        $buildArgs = @{
+          ImageType     = "${{ env.IMAGE_TYPE }}"
+          DotnetChannel = "${{ env.DOTNET_CHANNEL }}"
+        }
+
+        # Add workload set version if specified
+        if ("${{ env.WORKLOAD_SET_VERSION }}" -ne "") {
+          $buildArgs.WorkloadSetVersion = "${{ env.WORKLOAD_SET_VERSION }}"
+          Write-Host "Using specific workload set version: ${{ env.WORKLOAD_SET_VERSION }}"
+        } else {
+          Write-Host "No workload set version specified - will auto-detect latest"
+        }
+
+        if ("${{ inputs.force_build }}" -eq "true") {
+          $buildArgs.Force = $true
+        }
+
+        if ("${{ inputs.push_to_registry }}" -eq "true" -and "${{ inputs.registry }}" -ne "") {
+          $buildArgs.Push = $true
+          $buildArgs.Registry = "${{ inputs.registry }}"
+        }
+
+        Write-Host "Building Tart VM with parameters:"
+        $buildArgs.GetEnumerator() | ForEach-Object {
+          Write-Host "  $($_.Key): $($_.Value)"
+        }
+
+        cd macos/tart/scripts
+        ./build.ps1 @buildArgs
+
+    - name: 📊 Verify Build
+      shell: pwsh
+      run: |
+        Write-Host "Listing built Tart images..."
+        tart list
+
+        Write-Host ""
+        Write-Host "Checking disk space after build..."
+        df -h
+
+    - name: 📦 Export Build Info
+      if: success()
+      shell: pwsh
+      run: |
+        $imageName = if ("${{ env.DOTNET_CHANNEL }}" -eq "9.0") {
+          "maui-dev-tahoe-dotnet9.0"
+        } else {
+          "maui-dev-tahoe-dotnet10.0"
+        }
+
+        Write-Host "Build completed successfully!"
+        Write-Host "Image name: $imageName"
+        Write-Host ""
+        Write-Host "To run the VM locally:"
+        Write-Host "  tart run $imageName"
+        Write-Host ""
+        Write-Host "To run with GitHub Actions runner:"
+        Write-Host "  GITHUB_ORG=your-org GITHUB_TOKEN=ghp_xxx tart run $imageName"
+        Write-Host ""
+        Write-Host "To run with Gitea Actions runner:"
+        Write-Host "  GITEA_INSTANCE_URL=https://gitea.example.com GITEA_RUNNER_TOKEN=xxx tart run $imageName"
+
+  build-summary:
+    name: 📋 Build Summary
+    runs-on: ubuntu-latest
+    needs: build-tart-macos
+    if: always()
+
+    steps:
+    - name: 📋 Generate Summary
+      run: |
+        echo "## Tart VM Build Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Configuration" >> $GITHUB_STEP_SUMMARY
+        echo "- **.NET Channel:** ${{ env.DOTNET_CHANNEL }}" >> $GITHUB_STEP_SUMMARY
+        if [ -n "${{ env.WORKLOAD_SET_VERSION }}" ]; then
+          echo "- **Workload Set Version:** ${{ env.WORKLOAD_SET_VERSION }}" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- **Workload Set Version:** Auto-detected (latest)" >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "- **Image Type:** ${{ env.IMAGE_TYPE }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Force Build:** ${{ inputs.force_build }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Push to Registry:** ${{ inputs.push_to_registry }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Build Results" >> $GITHUB_STEP_SUMMARY
+        echo "- **macOS Build:** ${{ needs.build-tart-macos.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        if [ "${{ needs.build-tart-macos.result }}" == "success" ]; then
+          echo "✅ Build completed successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Image Details" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ env.DOTNET_CHANNEL }}" == "9.0" ]; then
+            echo "- **Image Name:** maui-dev-tahoe-dotnet9.0" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Image Name:** maui-dev-tahoe-dotnet10.0" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "- **Base:** macOS Tahoe 16 (Sequoia)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Xcode:** 26 (base) + 16.4 (additional)" >> $GITHUB_STEP_SUMMARY
+          echo "- **.NET:** ${{ env.DOTNET_CHANNEL }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Capabilities" >> $GITHUB_STEP_SUMMARY
+          echo "- iOS/tvOS/macOS builds" >> $GITHUB_STEP_SUMMARY
+          echo "- Android builds" >> $GITHUB_STEP_SUMMARY
+          echo "- .NET MAUI development" >> $GITHUB_STEP_SUMMARY
+          echo "- UI testing with Appium" >> $GITHUB_STEP_SUMMARY
+          echo "- GitHub Actions runner (auto-register)" >> $GITHUB_STEP_SUMMARY
+          echo "- Gitea Actions runner (auto-register)" >> $GITHUB_STEP_SUMMARY
+          echo "- Multiple Xcode versions" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⚠️ Build failed. Please check the job logs for details." >> $GITHUB_STEP_SUMMARY
+        fi
