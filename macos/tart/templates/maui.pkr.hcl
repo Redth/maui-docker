@@ -245,38 +245,18 @@ build {
     destination = "/tmp/gitea-runner.sh"
   }
 
+  # Copy Gitea runner installation script
+  provisioner "file" {
+    source      = "../scripts/install-gitea-runner.sh"
+    destination = "/tmp/install-gitea-runner.sh"
+  }
+
   # Install Gitea Actions runner
   provisioner "shell" {
     inline = [
       "export PATH=\"/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$$PATH\"",
-      "echo 'Installing Gitea Actions runner...'",
-      "mkdir -p /Users/admin/gitea-runner",
-      "cd /Users/admin/gitea-runner",
-      "# Detect architecture",
-      "ARCH=$$(uname -m)",
-      "if [ \"$${ARCH}\" = \"arm64\" ]; then",
-      "  DOWNLOAD_ARCH=\"arm64\"",
-      "else",
-      "  DOWNLOAD_ARCH=\"amd64\"",
-      "fi",
-      "echo \"Detected architecture: $${ARCH} (downloading $${DOWNLOAD_ARCH})\"",
-      "# Get latest release version - download to temp file and parse",
-      "curl -fsSL https://gitea.com/api/v1/repos/gitea/act_runner/releases -o /tmp/releases.json",
-      "LATEST_VERSION=$$(jq -r .[].tag_name /tmp/releases.json | head -1)",
-      "rm -f /tmp/releases.json",
-      "echo \"Latest act_runner version: $${LATEST_VERSION}\"",
-      "# Download act_runner binary",
-      "DOWNLOAD_URL=\"https://dl.gitea.com/act_runner/$${LATEST_VERSION}/act_runner-$${LATEST_VERSION}-darwin-$${DOWNLOAD_ARCH}\"",
-      "echo \"Downloading from: $${DOWNLOAD_URL}\"",
-      "curl -fsSL \"$${DOWNLOAD_URL}\" -o act_runner",
-      "chmod +x act_runner",
-      "# Move helper script into place",
-      "mv /tmp/gitea-runner.sh /Users/admin/gitea-runner/gitea-runner.sh",
-      "chmod +x /Users/admin/gitea-runner/gitea-runner.sh",
-      "chown -R admin:staff /Users/admin/gitea-runner",
-      "echo 'Gitea Actions runner installed'",
-      "echo 'Runner binary: /Users/admin/gitea-runner/act_runner'",
-      "echo 'Runner helper script: /Users/admin/gitea-runner/gitea-runner.sh'"
+      "chmod +x /tmp/install-gitea-runner.sh",
+      "/tmp/install-gitea-runner.sh"
     ]
     timeout = "10m"
   }
