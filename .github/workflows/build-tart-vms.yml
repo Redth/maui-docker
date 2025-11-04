@@ -41,11 +41,15 @@ env:
   DOTNET_CHANNEL: ${{ inputs.dotnet_channel || '10.0' }}
   IMAGE_TYPE: ${{ inputs.image_type || 'maui' }}
   WORKLOAD_SET_VERSION: ${{ inputs.workload_set_version }}
+  TART_REGISTRY: ghcr.io/${{ github.repository_owner }}
 
 jobs:
   build-tart-macos:
     name: 🍎 Build Tart VM (.NET ${{ inputs.dotnet_channel || '10.0' }})
     runs-on: macos-latest
+    permissions:
+      contents: read
+      packages: write
 
     steps:
     - name: 🛒 Checkout
@@ -80,6 +84,10 @@ jobs:
 
     - name: 🔧 Build Tart VM Image
       shell: pwsh
+      env:
+        # Tart uses these environment variables for OCI registry authentication
+        TART_REGISTRY_USERNAME: ${{ github.actor }}
+        TART_REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
       run: |
         $buildArgs = @{
           ImageType     = "${{ env.IMAGE_TYPE }}"
@@ -98,9 +106,30 @@ jobs:
           $buildArgs.Force = $true
         }
 
-        if ("${{ inputs.push_to_registry }}" -eq "true" -and "${{ inputs.registry }}" -ne "") {
+        # Determine if we should push to registry
+        $shouldPush = $false
+        $registry = ""
+
+        if ("${{ github.ref }}" -eq "refs/heads/main") {
+          Write-Host "Building from main branch - will push to GHCR"
+          $shouldPush = $true
+          $registry = "${{ env.TART_REGISTRY }}"
+        } elseif ("${{ inputs.push_to_registry }}" -eq "true") {
+          Write-Host "Manual push requested"
+          $shouldPush = $true
+          if ("${{ inputs.registry }}" -ne "") {
+            $registry = "${{ inputs.registry }}"
+          } else {
+            $registry = "${{ env.TART_REGISTRY }}"
+          }
+        }
+
+        if ($shouldPush) {
           $buildArgs.Push = $true
-          $buildArgs.Registry = "${{ inputs.registry }}"
+          $buildArgs.Registry = $registry
+          Write-Host "Will push to registry: $registry"
+        } else {
+          Write-Host "Build only - not pushing to registry"
         }
 
         Write-Host "Building Tart VM with parameters:"
@@ -134,6 +163,20 @@ jobs:
         Write-Host "Build completed successfully!"
         Write-Host "Image name: $imageName"
         Write-Host ""
+
+        if ("${{ github.ref }}" -eq "refs/heads/main" -or "${{ inputs.push_to_registry }}" -eq "true") {
+          $registry = if ("${{ inputs.registry }}" -ne "") { "${{ inputs.registry }}" } else { "${{ env.TART_REGISTRY }}" }
+          Write-Host "Image published to: $registry/$imageName"
+          Write-Host ""
+          Write-Host "To pull and run from registry:"
+          Write-Host "  tart clone $registry/$imageName $imageName"
+          Write-Host "  tart run $imageName"
+          Write-Host ""
+        } else {
+          Write-Host "Image built locally (not pushed to registry)"
+          Write-Host ""
+        }
+
         Write-Host "To run the VM locally:"
         Write-Host "  tart run $imageName"
         Write-Host ""
@@ -174,10 +217,31 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Image Details" >> $GITHUB_STEP_SUMMARY
           if [ "${{ env.DOTNET_CHANNEL }}" == "9.0" ]; then
-            echo "- **Image Name:** maui-dev-tahoe-dotnet9.0" >> $GITHUB_STEP_SUMMARY
+            IMAGE_NAME="maui-dev-tahoe-dotnet9.0"
           else
-            echo "- **Image Name:** maui-dev-tahoe-dotnet10.0" >> $GITHUB_STEP_SUMMARY
+            IMAGE_NAME="maui-dev-tahoe-dotnet10.0"
           fi
+          echo "- **Image Name:** $IMAGE_NAME" >> $GITHUB_STEP_SUMMARY
+
+          # Check if published to registry
+          if [ "${{ github.ref }}" == "refs/heads/main" ] || [ "${{ inputs.push_to_registry }}" == "true" ]; then
+            if [ -n "${{ inputs.registry }}" ]; then
+              REGISTRY="${{ inputs.registry }}"
+            else
+              REGISTRY="${{ env.TART_REGISTRY }}"
+            fi
+            echo "- **Published to:** \`$REGISTRY/$IMAGE_NAME\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Pull and Run" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+            echo "tart clone $REGISTRY/$IMAGE_NAME $IMAGE_NAME" >> $GITHUB_STEP_SUMMARY
+            echo "tart run $IMAGE_NAME" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Status:** Built locally (not published)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Base:** macOS Tahoe 16 (Sequoia)" >> $GITHUB_STEP_SUMMARY
           echo "- **Xcode:** 26 (base) + 16.4 (additional)" >> $GITHUB_STEP_SUMMARY
           echo "- **.NET:** ${{ env.DOTNET_CHANNEL }}" >> $GITHUB_STEP_SUMMARY

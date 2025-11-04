@@ -209,17 +209,48 @@ tart push maui-dev-tahoe-dotnet10.0 your-registry/maui-dev-tahoe-dotnet10.0:late
 ```
 
 ### Image Management
+
+**Using Published Images from GHCR:**
 ```bash
-# List available images
+# Pull image from GitHub Container Registry
+tart clone ghcr.io/redth/maui-dev-tahoe-dotnet10.0 maui-dev-tahoe-dotnet10.0
+
+# Run the VM
+tart run maui-dev-tahoe-dotnet10.0
+
+# List local images
 tart list
 
 # Clean up unused images
 tart prune
-
-# Push to registry (both .NET versions use tahoe, differentiated by .NET version)
-tart push maui-dev-tahoe-dotnet9.0 your-registry/maui-dev-tahoe-dotnet9.0:latest
-tart push maui-dev-tahoe-dotnet10.0 your-registry/maui-dev-tahoe-dotnet10.0:latest
 ```
+
+**Manual Publishing:**
+```bash
+# Build locally
+pwsh ./scripts/build.ps1 -ImageType maui -DotnetChannel 10.0
+
+# Push to GHCR (requires authentication)
+export TART_REGISTRY_USERNAME=your-github-username
+export TART_REGISTRY_PASSWORD=your-github-pat
+tart push maui-dev-tahoe-dotnet10.0 ghcr.io/yourorg/maui-dev-tahoe-dotnet10.0
+
+# Or push to custom registry
+tart push maui-dev-tahoe-dotnet10.0 your-registry.com/maui-dev-tahoe-dotnet10.0
+```
+
+## Automated Publishing to GHCR
+
+Tart VM images are automatically published to GitHub Container Registry (ghcr.io) when:
+- Built from the `main` branch via GitHub Actions
+- Triggered by the automated workload update check
+- Manually built with "Push to registry" enabled
+
+**Published Image Locations:**
+- `ghcr.io/redth/maui-dev-tahoe-dotnet9.0` - .NET 9.0 MAUI development VM
+- `ghcr.io/redth/maui-dev-tahoe-dotnet10.0` - .NET 10.0 MAUI development VM
+
+**Authentication:** GitHub Actions uses `GITHUB_TOKEN` automatically. For local use, you need a GitHub Personal Access Token with `packages:write` permission.
 
 ## Prerequisites
 
