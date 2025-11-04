@@ -14,14 +14,15 @@ else
 fi
 echo "Detected architecture: ${ARCH} (downloading ${DOWNLOAD_ARCH})"
 
-# Get latest release version
+# Get latest release and extract the correct download URL from assets
 curl -fsSL https://gitea.com/api/v1/repos/gitea/act_runner/releases -o /tmp/releases.json
 LATEST_VERSION=$(jq -r '.[0].tag_name' /tmp/releases.json)
+# Remove 'v' prefix from version for filename matching
+VERSION_NO_V=$(echo "${LATEST_VERSION}" | sed 's/^v//')
+# Find the matching asset by name
+DOWNLOAD_URL=$(jq -r ".[0].assets[] | select(.name == \"act_runner-${VERSION_NO_V}-darwin-${DOWNLOAD_ARCH}\") | .browser_download_url" /tmp/releases.json)
 rm -f /tmp/releases.json
 echo "Latest act_runner version: ${LATEST_VERSION}"
-
-# Download act_runner binary
-DOWNLOAD_URL="https://dl.gitea.com/act_runner/${LATEST_VERSION}/act_runner-${LATEST_VERSION}-darwin-${DOWNLOAD_ARCH}"
 echo "Downloading from: ${DOWNLOAD_URL}"
 curl -fsSL "${DOWNLOAD_URL}" -o act_runner
 chmod +x act_runner
