@@ -88,6 +88,8 @@ jobs:
         # Tart uses these environment variables for OCI registry authentication
         TART_REGISTRY_USERNAME: ${{ github.actor }}
         TART_REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        # Packer uses this to authenticate GitHub API requests for plugin downloads
+        PACKER_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         $buildArgs = @{
           ImageType     = "${{ env.IMAGE_TYPE }}"
