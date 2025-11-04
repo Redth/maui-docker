@@ -261,18 +261,31 @@ function Start-TartBuild {
         return
     }
 
-    Write-Host "Initializing Packer plugins..."
-    & packer init $TemplatePath
+    # Change to the templates directory so Packer resolves file paths correctly
+    # File provisioner paths in templates are relative to the working directory
+    $originalLocation = Get-Location
+    $templateDir = Split-Path -Parent $TemplatePath
+    $templateFile = Split-Path -Leaf $TemplatePath
 
-    if ($LASTEXITCODE -ne 0) {
-        throw "Packer init failed with exit code $LASTEXITCODE"
+    try {
+        Set-Location $templateDir
+
+        Write-Host "Initializing Packer plugins..."
+        & packer init $templateFile
+
+        if ($LASTEXITCODE -ne 0) {
+            throw "Packer init failed with exit code $LASTEXITCODE"
+        }
+
+        Write-Host "Running Packer build..."
+        & packer build @varArgs $templateFile
+
+        if ($LASTEXITCODE -ne 0) {
+            throw "Packer build failed with exit code $LASTEXITCODE"
+        }
     }
-
-    Write-Host "Running Packer build..."
-    & packer build @varArgs $TemplatePath
-
-    if ($LASTEXITCODE -ne 0) {
-        throw "Packer build failed with exit code $LASTEXITCODE"
+    finally {
+        Set-Location $originalLocation
     }
 }
 
