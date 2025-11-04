@@ -256,8 +256,16 @@ function Start-TartBuild {
     }
 
     if ($DryRun) {
+        Write-Host "[DryRun] Would run: packer init $TemplatePath"
         Write-Host "[DryRun] Would run: packer build $($varArgs -join ' ') $TemplatePath"
         return
+    }
+
+    Write-Host "Initializing Packer plugins..."
+    & packer init $TemplatePath
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Packer init failed with exit code $LASTEXITCODE"
     }
 
     Write-Host "Running Packer build..."
