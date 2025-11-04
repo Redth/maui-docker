@@ -6,7 +6,15 @@ function Invoke-ExternalCommand {
         [string]$WorkingDirectory = (Get-Location).Path
     )
 
-    Write-Host "Running: $Command $($Arguments -join ' ')"
+    $formattedArgs = $Arguments | ForEach-Object {
+        if ($_ -match '\s') {
+            '"{0}"' -f ($_ -replace '"', '\"')
+        } else {
+            $_
+        }
+    }
+
+    Write-Host "Running: $Command $($formattedArgs -join ' ')"
 
     if (Test-DryRun) {
         Write-Host "[DryRun] Skipping execution"

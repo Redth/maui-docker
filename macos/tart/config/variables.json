@@ -1,0 +1,28 @@
+{
+  "cpu_count": 4,
+  "memory_gb": 8,
+  "ssh_username": "admin",
+  "ssh_password": "admin",
+  "registry": "",
+  "build_settings": {
+    "maui_image_disk_size_gb": 60,
+    "ci_image_disk_size_gb": 50
+  },
+  "optimization": {
+    "disable_spotlight": true,
+    "disable_auto_updates": true,
+    "disable_sleep": true,
+    "increase_file_limits": true
+  },
+  "development_tools": {
+    "visual_studio_code": true,
+    "github_desktop": true,
+    "postman": true
+  },
+  "ci_tools": {
+    "github_cli": true,
+    "fastlane": true,
+    "appium": true,
+    "coverage_tools": true
+  }
+}

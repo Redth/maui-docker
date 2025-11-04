@@ -51,11 +51,11 @@ jobs:
         }
 
   trigger-build-all:
-    name: 🚀 Trigger All Builds
+    name: 🚀 Trigger Docker Builds
     needs: check-updates
     if: needs.check-updates.outputs.trigger-builds == 'true'
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: 🚀 Trigger Build All Workflow
       uses: actions/github-script@v7
@@ -63,9 +63,9 @@ jobs:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
           const workloadVersion = '${{ needs.check-updates.outputs.workload-set-version }}';
-          
+
           console.log(`Triggering build-all workflow for workload set version: ${workloadVersion}`);
-          
+
           try {
             await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
@@ -81,7 +81,7 @@ jobs:
           } catch (error) {
             console.log(`❌ Failed to trigger workflow: ${error.message}`);
             console.log('🔄 Trying alternative approach with repository dispatch...');
-            
+
             // Alternative: Use repository dispatch
             await github.rest.repos.createDispatchEvent({
               owner: context.repo.owner,
@@ -95,12 +95,49 @@ jobs:
             console.log('✅ Successfully sent repository dispatch event');
           }
 
+  trigger-build-tart:
+    name: 🚀 Trigger Tart VM Builds
+    needs: check-updates
+    if: needs.check-updates.outputs.trigger-builds == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        dotnet_channel: ['9.0', '10.0']
+
+    steps:
+    - name: 🚀 Trigger Tart VM Build for .NET ${{ matrix.dotnet_channel }}
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const workloadVersion = '${{ needs.check-updates.outputs.workload-set-version }}';
+          console.log(`Triggering Tart VM build for .NET ${{ matrix.dotnet_channel }} with workload version: ${workloadVersion}`);
+
+          try {
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'build-tart-vms.yml',
+              ref: 'main',
+              inputs: {
+                dotnet_channel: '${{ matrix.dotnet_channel }}',
+                workload_set_version: workloadVersion,
+                image_type: 'maui',
+                force_build: '${{ needs.check-updates.outputs.force-build }}'
+              }
+            });
+            console.log('✅ Successfully triggered Tart VM build for .NET ${{ matrix.dotnet_channel }}');
+          } catch (error) {
+            console.log(`❌ Failed to trigger Tart VM build: ${error.message}`);
+            throw error;
+          }
+
   notify-results:
     name: 📢 Notify Results
-    needs: [check-updates, trigger-build-all]
+    needs: [check-updates, trigger-build-all, trigger-build-tart]
     if: always()
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: 📢 Summary
       run: |
@@ -112,22 +149,29 @@ jobs:
         echo "- **New version found:** ${{ needs.check-updates.outputs.new-version }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Builds triggered:** ${{ needs.check-updates.outputs.trigger-builds }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Force build:** ${{ needs.check-updates.outputs.force-build }}" >> $GITHUB_STEP_SUMMARY
-        
+
         if [[ "${{ needs.check-updates.outputs.trigger-builds }}" == "true" ]]; then
-          echo "- **Build trigger status:** ${{ needs.trigger-build-all.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Docker builds status:** ${{ needs.trigger-build-all.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tart VM builds status:** ${{ needs.trigger-build-tart.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           if [[ "${{ needs.check-updates.outputs.force-build }}" == "true" ]]; then
             echo "🔄 Force build triggered!" >> $GITHUB_STEP_SUMMARY
             echo "   - All images will be rebuilt regardless of existing tags" >> $GITHUB_STEP_SUMMARY
           else
             echo "✅ New workload set version detected!" >> $GITHUB_STEP_SUMMARY
           fi
-          
-          echo "   - Combined build workflow triggered with proper dependency order:" >> $GITHUB_STEP_SUMMARY
-          echo "     1. Base images (Linux + Windows)" >> $GITHUB_STEP_SUMMARY
-          echo "     2. Runner images (depends on base)" >> $GITHUB_STEP_SUMMARY
-          echo "     3. Test images (depends on base)" >> $GITHUB_STEP_SUMMARY
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Docker Images Build Order:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Base images (Linux + Windows)" >> $GITHUB_STEP_SUMMARY
+          echo "2. GitHub Runner images (depends on base)" >> $GITHUB_STEP_SUMMARY
+          echo "3. Gitea Runner images (depends on base)" >> $GITHUB_STEP_SUMMARY
+          echo "4. Test images (depends on base)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Tart VM Images:" >> $GITHUB_STEP_SUMMARY
+          echo "- macOS MAUI development VMs (.NET 9.0 and 10.0)" >> $GITHUB_STEP_SUMMARY
+          echo "- Includes GitHub Actions and Gitea Actions runners" >> $GITHUB_STEP_SUMMARY
         else
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "ℹ️ No new workload set version found. All builds are up to date." >> $GITHUB_STEP_SUMMARY

@@ -19,11 +19,11 @@ function Ensure-XcodeVersion {
         # Check if it's selected
         if (-not $xcodeInfo.IsSelected) {
             if ($isDryRun) {
-                Write-Host "[DryRun] Would select Xcode $RecommendedVersion using xcode-select"
+                Write-Host "[DryRun] Would select Xcode $RecommendedVersion using xcodes"
             } else {
                 Write-Host "Selecting Xcode $RecommendedVersion..."
                 try {
-                    Invoke-ExternalCommand -Command "sudo" -Arguments @("xcode-select", "-s", $xcodeInfo.Path)
+                    Invoke-ExternalCommand -Command "xcodes" -Arguments @("select", "--path", $xcodeInfo.Path)
                     Write-Host "Successfully selected Xcode $RecommendedVersion"
                 } catch {
                     Write-Warning "Failed to select Xcode $RecommendedVersion`: $($_.Exception.Message)"
@@ -67,11 +67,11 @@ function Ensure-XcodeVersion {
 
         if (-not $xcodeInfo.IsSelected) {
             if ($isDryRun) {
-                Write-Host "[DryRun] Would select Xcode $compatibleVersion using xcode-select"
+                Write-Host "[DryRun] Would select Xcode $compatibleVersion using xcodes"
             } else {
                 Write-Host "Selecting Xcode $compatibleVersion..."
                 try {
-                    Invoke-ExternalCommand -Command "sudo" -Arguments @("xcode-select", "-s", $xcodeInfo.Path)
+                    Invoke-ExternalCommand -Command "xcodes" -Arguments @("select", "--path", $xcodeInfo.Path)
                     Write-Host "Successfully selected Xcode $compatibleVersion"
                 } catch {
                     Write-Warning "Failed to select Xcode $compatibleVersion`: $($_.Exception.Message)"
@@ -89,7 +89,7 @@ function Ensure-XcodeVersion {
 
     if ($isDryRun) {
         Write-Host "[DryRun] Would install Xcode $RecommendedVersion using xcodes"
-        Write-Host "[DryRun] Would select Xcode $RecommendedVersion using xcode-select"
+        Write-Host "[DryRun] Would select Xcode $RecommendedVersion using xcodes"
         Write-Host "[DryRun] Would install Xcode command line tools"
         return $true
     }
@@ -107,7 +107,7 @@ function Ensure-XcodeVersion {
         }
 
         Write-Host "Selecting Xcode $RecommendedVersion..."
-        Invoke-ExternalCommand -Command "sudo" -Arguments @("xcode-select", "-s", $newXcodePath)
+        Invoke-ExternalCommand -Command "xcodes" -Arguments @("select", "--path", $newXcodePath)
 
         # Install command line tools
         Write-Host "Installing Xcode command line tools..."

@@ -9,12 +9,23 @@ function Get-InstalledXcodeVersions {
             $output = & xcodes installed 2>$null
             if ($LASTEXITCODE -eq 0 -and $output) {
                 foreach ($line in $output) {
-                    # Parse lines like "16.4 (16L65) ✓ (/Applications/Xcode.app)"
-                    if ($line -match '^(\d+\.?\d*(?:\.\d+)?)\s+\([^)]+\)\s+(.*)$') {
+                    # Parse lines like "16.4 (16F6)                /Applications/Xcode-16.4.0.app"
+                    # or "26.0.1 (17A400) (Selected) /Applications/Xcode.app"
+                    if ($line -match '^(\d+\.?\d*(?:\.\d+)?)\s+\([^)]+\)\s*(?:\([^)]+\)\s*)?(.*)$') {
                         $version = $Matches[1]
-                        $status = $Matches[2].Trim()
-                        $isSelected = $status -match '✓'
-                        $path = if ($status -match '\(([^)]+)\)') { $Matches[1] } else { $null }
+                        $path = $Matches[2].Trim()
+
+                        $parenMatches = [regex]::Matches($line, '\([^)]+\)')
+                        $isSelected = $false
+                        if ($parenMatches.Count -ge 2) {
+                            $selectionText = $parenMatches[1].Value.Trim('(', ')')
+                            $isSelected = $selectionText -match 'Selected'
+                        }
+
+                        # Skip if no path found
+                        if (-not $path -or $path -eq '') {
+                            continue
+                        }
 
                         $installedVersions[$version] = @{
                             Version = $version
