@@ -1,11 +1,19 @@
 # maui-docker
-Docker images for MAUI development/building/testing. See the [Repository Guidelines](AGENTS.md) for contributor instructions.
+Docker images and macOS VMs for MAUI development/building/testing. See the [Repository Guidelines](AGENTS.md) for contributor instructions.
 
-This repository provides three types of Docker images for .NET MAUI development:
+This repository provides comprehensive tooling for .NET MAUI development:
 
-1. **Base Images** - MAUI development environment without GitHub Actions runner
-2. **Runner Images** - Base images + GitHub Actions runner for CI/CD
-3. **Test Images** - Ready-to-use testing environment with Appium and Android Emulator
+## Docker Images (Linux/Windows)
+1. **Base Images** - MAUI development environment without CI runner
+2. **GitHub Runner Images** - Base images + GitHub Actions runner for CI/CD
+3. **Gitea Runner Images** - Base images + Gitea Actions runner for CI/CD
+4. **Test Images** - Ready-to-use testing environment with Appium and Android Emulator
+
+## macOS Virtual Machines (Tart)
+5. **Tart VM Images** - Complete macOS MAUI development VMs with iOS/macOS/Android support
+   - Published to GitHub Container Registry (ghcr.io)
+   - Includes both GitHub and Gitea Actions runners
+   - Supports multiple Xcode versions
 
 ## Base Images
 
@@ -166,6 +174,143 @@ docker run `
 > NOTE: The .NET Workloads are installed with the latest Workload set version for the given .NET SDK major version (eg: 9.0 SDK could have 9.0.203 as the latest workload set version).
 
 > NOTE: Versions for things like OpenJDK and Android SDK (including the individual SDK packages/components) are inferred from the Workloads' `data/WorkloadDependencies.json` files (in their Manifest nuget packages), which specify recommended versions and components to be installed for each workload.
+
+------------------
+
+## Gitea Runner Images
+
+Runner images build upon the base images and add the Gitea Actions runner service. They're designed for self-hosted CI/CD scenarios with Gitea where you need the full MAUI development stack.
+
+- Linux: ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-gitea-runner/linux-dotnet9.0?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-gitea-runner%2Ftags)
+- Windows: ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-gitea-runner/windows-dotnet9.0?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-gitea-runner%2Ftags)
+
+These images derive from the base images and include the Gitea `act_runner` binary for seamless integration with Gitea Actions.
+
+```
+Base Image (MAUI Dev Environment)
+    ↓
+Gitea Runner Image (Base + Gitea act_runner)
+```
+
+Runner images are intended to make it really easy to stand up self-hosted build agents with a complete .NET MAUI SDK environment. They have the latest workload set installed for the given .NET SDK version and automatically install, configure (including self registration), and run the Gitea Actions Runner service when the container starts.
+
+## Usage:
+
+```pwsh
+docker run `
+    -e GITEA_INSTANCE_URL=https://gitea.example.com `
+    -e GITEA_RUNNER_TOKEN=your_runner_token `
+    redth/maui-gitea-runner:linux-dotnet9.0
+```
+
+> NOTE: You can generate a runner registration token from your Gitea instance under Settings → Actions → Runners.
+
+### Environment Variables:
+- `GITEA_INSTANCE_URL` Required Gitea instance URL (e.g., https://gitea.example.com).
+- `GITEA_RUNNER_TOKEN` Required runner registration token from Gitea instance.
+- `GITEA_RUNNER_NAME` Optionally sets an explicit runner name. Default is `maui-runner-{random}`.
+- `GITEA_RUNNER_LABELS` Optional comma-separated labels (default: `ubuntu-latest,maui,dotnet`).
+- `INIT_PWSH_SCRIPT` Optionally (linux or windows images) specify a path to a .ps1 script file to run before starting the runner agent (Default path is `/config/init.ps1` on linux and `C:\\config\\init.ps1` on windows - you would need to bind a volume for the script to use)
+- `INIT_BASH_SCRIPT` Optionally (linux image only) specify a path to a .sh script file to run before starting the runner agent (Default path is `/config/init.sh` on linux - you would need to bind a volume for the script to use)
+
+### Installed Software
+- Chocolatey (Windows)
+- Microsoft OpenJDK
+- Android SDK
+- .NET SDK
+- .NET Workloads
+- Gitea act_runner
+
+See [gitea-runner/README.md](gitea-runner/README.md) for detailed documentation.
+
+------------------
+
+## Tart VM Images (macOS)
+
+Tart VM images provide complete macOS virtual machines for .NET MAUI development, including iOS, macOS, and Android support. These VMs are pre-configured with Xcode, .NET SDK, Android SDK, and both GitHub and Gitea Actions runners.
+
+**Published Images:**
+- `ghcr.io/redth/maui-dev-tahoe-dotnet9.0`
+- `ghcr.io/redth/maui-dev-tahoe-dotnet10.0`
+
+Images are automatically built and published to GitHub Container Registry (ghcr.io) when workload updates are detected or when manually triggered.
+
+### Quick Start
+
+Pull and run a Tart VM:
+
+```bash
+# Pull the latest .NET 9.0 image
+tart pull ghcr.io/redth/maui-dev-tahoe-dotnet9.0:latest
+
+# Clone and run the VM
+tart clone ghcr.io/redth/maui-dev-tahoe-dotnet9.0:latest maui-dev
+tart run maui-dev
+
+# Or run directly without cloning
+tart run ghcr.io/redth/maui-dev-tahoe-dotnet9.0:latest
+```
+
+### Using with GitHub Actions
+
+```bash
+# Set environment variables and run
+GITHUB_TOKEN=your_token \
+GITHUB_ORG=your-org \
+GITHUB_REPO=your-repo \
+tart run ghcr.io/redth/maui-dev-tahoe-dotnet9.0:latest
+```
+
+The VM will automatically:
+1. Register as a GitHub Actions self-hosted runner
+2. Wait for jobs from your repository
+3. Execute workflows with full iOS/macOS/Android build capabilities
+
+### Using with Gitea Actions
+
+```bash
+# Set environment variables and run
+GITEA_INSTANCE_URL=https://gitea.example.com \
+GITEA_RUNNER_TOKEN=your_token \
+tart run ghcr.io/redth/maui-dev-tahoe-dotnet9.0:latest
+```
+
+### Environment Variables
+
+**GitHub Actions Runner:**
+- `GITHUB_TOKEN` - GitHub access token with runner permissions
+- `GITHUB_ORG` - GitHub organization name
+- `GITHUB_REPO` - Repository name (optional, defaults to org-level)
+- `GITHUB_RUNNER_NAME` - Custom runner name
+- `GITHUB_RUNNER_LABELS` - Custom labels (comma-separated)
+
+**Gitea Actions Runner:**
+- `GITEA_INSTANCE_URL` - Gitea instance URL
+- `GITEA_RUNNER_TOKEN` - Runner registration token
+- `GITEA_RUNNER_NAME` - Custom runner name
+- `GITEA_RUNNER_LABELS` - Custom labels (comma-separated)
+
+> NOTE: If both GitHub and Gitea variables are set, both runners will be started.
+
+### What's Included:
+- **macOS Tahoe** (macOS 15) base system
+- **Xcode** with recommended version for .NET workloads
+- **iOS and tvOS Simulators** matching Xcode version
+- **.NET SDK** with MAUI workloads
+- **Android SDK** with latest tools and API levels
+- **Microsoft OpenJDK** for Android development
+- **PowerShell** for cross-platform scripting
+- **GitHub Actions runner** (act_runner binary)
+- **Gitea Actions runner** (act_runner binary)
+- **Development tools** (Git, build tools, etc.)
+
+### Supported Configurations:
+- **.NET 9.0**: Stable workloads with Xcode 16.1
+- **.NET 10.0**: Preview/RC workloads with latest Xcode
+
+### Building Custom Images
+
+See [macos/tart/README.md](macos/tart/README.md) for instructions on building custom Tart VM images with specific .NET versions, workload sets, or Xcode versions.
 
 ------------------
 
