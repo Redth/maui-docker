@@ -261,7 +261,7 @@ build {
       "fi",
       "echo \"Detected architecture: $$ARCH (downloading $$DOWNLOAD_ARCH)\"",
       "# Get latest release version",
-      "LATEST_VERSION=$$(curl -fsSL https://gitea.com/api/v1/repos/gitea/act_runner/releases | jq -r '.[0].tag_name')",
+      "LATEST_VERSION=$$(curl -fsSL https://gitea.com/api/v1/repos/gitea/act_runner/releases | jq -r .[].tag_name | head -1)",
       "echo \"Latest act_runner version: $$LATEST_VERSION\"",
       "# Download act_runner binary",
       "DOWNLOAD_URL=\"https://dl.gitea.com/act_runner/$$LATEST_VERSION/act_runner-$$LATEST_VERSION-darwin-$$DOWNLOAD_ARCH\"",
