@@ -124,7 +124,7 @@ build {
   }
 
   provisioner "file" {
-    source      = "./scripts/github-runner.sh"
+    source      = "../scripts/github-runner.sh"
     destination = "/tmp/github-runner.sh"
   }
 
@@ -169,7 +169,7 @@ build {
 
   # Copy Xcode installation script
   provisioner "file" {
-    source      = "./scripts/install-additional-xcodes.sh"
+    source      = "../scripts/install-additional-xcodes.sh"
     destination = "/tmp/install-additional-xcodes.sh"
   }
 
@@ -241,7 +241,7 @@ build {
 
   # Copy Gitea Actions runner helper script
   provisioner "file" {
-    source      = "./scripts/gitea-runner.sh"
+    source      = "../scripts/gitea-runner.sh"
     destination = "/tmp/gitea-runner.sh"
   }
 
@@ -281,7 +281,7 @@ build {
 
   # Copy shell profile setup script
   provisioner "file" {
-    source      = "./scripts/setup-shell-profiles.sh"
+    source      = "../scripts/setup-shell-profiles.sh"
     destination = "/tmp/setup-shell-profiles.sh"
   }
 
