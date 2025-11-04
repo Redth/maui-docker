@@ -16,7 +16,7 @@ on:
         description: 'JSON array of Android API levels to build (e.g., [34, 35])'
         required: false
         type: string
-        default: '[23, 24, 25, 26, 28, 29, 30, 31, 32, 33, 34, 35]'
+        default: '[23, 24, 25, 26, 28, 29, 30, 31, 32, 33, 34, 35, 36]'
       force_build:
         description: 'Force building and pushing of all images regardless of existing tags'
         required: false
