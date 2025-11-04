@@ -234,10 +234,21 @@ jobs:
             fi
             echo "- **Published to:** \`$REGISTRY/$IMAGE_NAME\`" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Available Tags" >> $GITHUB_STEP_SUMMARY
+            echo "- \`:latest\` - Latest build" >> $GITHUB_STEP_SUMMARY
+            if [ -n "${{ env.WORKLOAD_SET_VERSION }}" ]; then
+              echo "- \`:workloads${{ env.WORKLOAD_SET_VERSION }}\` - Specific workload version" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- \`:workloads{version}\` - Specific workload version (auto-detected during build)" >> $GITHUB_STEP_SUMMARY
+            fi
+            echo "" >> $GITHUB_STEP_SUMMARY
             echo "### Pull and Run" >> $GITHUB_STEP_SUMMARY
             echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-            echo "tart clone $REGISTRY/$IMAGE_NAME $IMAGE_NAME" >> $GITHUB_STEP_SUMMARY
-            echo "tart run $IMAGE_NAME" >> $GITHUB_STEP_SUMMARY
+            echo "# Pull latest" >> $GITHUB_STEP_SUMMARY
+            echo "tart pull $REGISTRY/$IMAGE_NAME:latest" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "# Run the VM" >> $GITHUB_STEP_SUMMARY
+            echo "tart run $REGISTRY/$IMAGE_NAME:latest" >> $GITHUB_STEP_SUMMARY
             echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           else
             echo "- **Status:** Built locally (not published)" >> $GITHUB_STEP_SUMMARY

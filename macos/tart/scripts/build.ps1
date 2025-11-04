@@ -31,6 +31,16 @@ $ErrorActionPreference = "Stop"
 $scriptDir = Split-Path -Parent $PSScriptRoot
 $templatesDir = Join-Path $scriptDir "templates"
 $configDir = Join-Path $scriptDir "config"
+$repoRoot = Split-Path -Parent (Split-Path -Parent $scriptDir)
+
+# Load common functions for workload resolution
+$commonFunctionsPath = Join-Path $repoRoot "common-functions.ps1"
+if (Test-Path $commonFunctionsPath) {
+    . $commonFunctionsPath
+} else {
+    Write-Warning "common-functions.ps1 not found at: $commonFunctionsPath"
+    Write-Warning "Workload version resolution will not be available"
+}
 
 # Load configuration
 $variablesFile = Join-Path $configDir "variables.json"
@@ -290,25 +300,59 @@ function Start-TartBuild {
 }
 
 function Push-TartImage {
-    param([string]$ImageName, [string]$Registry)
+    param(
+        [string]$ImageName,
+        [string]$Registry,
+        [string]$WorkloadSetVersion
+    )
 
     if (-not $Registry) {
         Write-Host "No registry specified, skipping push"
         return
     }
 
-    $fullImageName = "$Registry/$ImageName"
+    # Build list of tags to push
+    $tags = @()
+
+    # 1. Latest tag
+    # Use ${ImageName} to explicitly delimit the variable name (: has special meaning in PowerShell strings)
+    $latestTag = "$Registry/${ImageName}:latest"
+    $tags += $latestTag
+
+    # 2. Workload-specific tag (if workload version is known)
+    if ($WorkloadSetVersion) {
+        $workloadTag = "$Registry/${ImageName}:workloads$WorkloadSetVersion"
+        $tags += $workloadTag
+    }
 
     if ($DryRun) {
-        Write-Host "[DryRun] Would push image to: $fullImageName"
+        Write-Host "[DryRun] Would push image with tags:"
+        foreach ($tag in $tags) {
+            Write-Host "  - $tag"
+        }
         return
     }
 
-    Write-Host "Pushing image to registry..."
-    & tart push $ImageName $fullImageName
+    Write-Host "Pushing image to registry with multiple tags..."
+    $pushCount = 0
+    foreach ($tag in $tags) {
+        Write-Host "  Pushing: $tag"
+        & tart push $ImageName $tag
 
-    if ($LASTEXITCODE -ne 0) {
-        throw "Failed to push image to registry"
+        if ($LASTEXITCODE -eq 0) {
+            $pushCount++
+            Write-Host "    ✓ Success"
+        } else {
+            Write-Warning "    ✗ Failed to push tag: $tag"
+        }
+    }
+
+    if ($pushCount -eq 0) {
+        throw "Failed to push image to registry - all tags failed"
+    } elseif ($pushCount -lt $tags.Count) {
+        Write-Warning "Some tags failed to push ($pushCount/$($tags.Count) succeeded)"
+    } else {
+        Write-Host "Successfully pushed all $pushCount tags"
     }
 }
 
@@ -323,6 +367,23 @@ function Test-ImageExists {
 try {
     Test-Prerequisites
 
+    # Resolve workload set version if not explicitly provided
+    # This allows us to tag the image with the specific workload version
+    $resolvedWorkloadSetVersion = $WorkloadSetVersion
+    if (-not $resolvedWorkloadSetVersion -and (Get-Command Get-WorkloadSetInfo -ErrorAction SilentlyContinue)) {
+        Write-Host "Resolving workload set version for .NET $DotnetChannel..."
+        try {
+            $workloadInfo = Get-WorkloadSetInfo -DotnetVersion $DotnetChannel
+            if ($workloadInfo -and $workloadInfo.DotnetCommandWorkloadSetVersion) {
+                $resolvedWorkloadSetVersion = $workloadInfo.DotnetCommandWorkloadSetVersion
+                Write-Host "Resolved workload set version: $resolvedWorkloadSetVersion"
+            }
+        } catch {
+            Write-Warning "Could not auto-resolve workload version: $_"
+            Write-Warning "Image will only be tagged with :latest"
+        }
+    }
+
     # Check if image already exists
     if ((Test-ImageExists $ImageName) -and -not $Force) {
         Write-Warning "Image '$ImageName' already exists. Use -Force to rebuild."
@@ -334,6 +395,8 @@ try {
     $templatePath = Join-Path $templatesDir $templateFile
 
     # Prepare build variables
+    # Use the original WorkloadSetVersion parameter for the build (can be empty for auto-detect)
+    # but use resolvedWorkloadSetVersion for tagging
     $buildVars = @{
         "image_name" = $ImageName
         "base_image" = $BaseImage
@@ -366,12 +429,21 @@ try {
 
     # Push to registry if requested
     if ($Push) {
-        Push-TartImage -ImageName $ImageName -Registry $Registry
+        Push-TartImage -ImageName $ImageName -Registry $Registry -WorkloadSetVersion $resolvedWorkloadSetVersion
     }
 
     Write-Host ""
     Write-Host "✅ Build completed successfully!"
     Write-Host "Image name: $ImageName"
+
+    if ($Push -and $Registry) {
+        Write-Host ""
+        Write-Host "Published tags:"
+        Write-Host "  $Registry/${ImageName}:latest"
+        if ($resolvedWorkloadSetVersion) {
+            Write-Host "  $Registry/${ImageName}:workloads$resolvedWorkloadSetVersion"
+        }
+    }
 
     if (-not $DryRun) {
         Write-Host ""
@@ -380,6 +452,15 @@ try {
         Write-Host ""
         Write-Host "To run with directory mounting:"
         Write-Host "  tart run $ImageName --dir project:/path/to/your/project"
+
+        if ($Registry) {
+            Write-Host ""
+            Write-Host "To pull from registry:"
+            Write-Host "  tart pull $Registry/${ImageName}:latest"
+            if ($resolvedWorkloadSetVersion) {
+                Write-Host "  tart pull $Registry/${ImageName}:workloads$resolvedWorkloadSetVersion"
+            }
+        }
     }
 
 } catch {
