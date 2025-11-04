@@ -119,7 +119,7 @@ build {
 
   # Copy provisioning module to VM
   provisioner "file" {
-    source      = "../../provisioning/MauiProvisioning"
+    source      = "../../../provisioning/MauiProvisioning"
     destination = "/tmp/MauiProvisioning"
   }
 
@@ -130,7 +130,7 @@ build {
 
   # Copy common functions
   provisioner "file" {
-    source      = "../../common-functions.ps1"
+    source      = "../../../common-functions.ps1"
     destination = "/tmp/common-functions.ps1"
   }
 
