@@ -226,6 +226,36 @@ build {
     timeout = "30m"
   }
 
+  # Copy bootstrap initialization script and LaunchAgent
+  provisioner "file" {
+    source      = "../scripts/bootstrap.sh"
+    destination = "/tmp/bootstrap.sh"
+  }
+
+  provisioner "file" {
+    source      = "../scripts/com.maui.bootstrap.plist"
+    destination = "/tmp/com.maui.bootstrap.plist"
+  }
+
+  # Install bootstrap initialization system
+  provisioner "shell" {
+    inline = [
+      "export PATH=\"/usr/bin:/bin:/usr/sbin:/sbin:$$PATH\"",
+      "echo 'Installing bootstrap initialization system...'",
+      "mkdir -p /Users/admin/Library/LaunchAgents",
+      "mkdir -p /Users/admin/Library/Logs",
+      "mv /tmp/bootstrap.sh /Users/admin/bootstrap.sh",
+      "chown admin:staff /Users/admin/bootstrap.sh",
+      "chmod +x /Users/admin/bootstrap.sh",
+      "mv /tmp/com.maui.bootstrap.plist /Users/admin/Library/LaunchAgents/com.maui.bootstrap.plist",
+      "chown admin:staff /Users/admin/Library/LaunchAgents/com.maui.bootstrap.plist",
+      "chmod 644 /Users/admin/Library/LaunchAgents/com.maui.bootstrap.plist",
+      "echo 'Bootstrap system installed'",
+      "echo 'Mount config folder with: tart run <image> --dir config:/path/to/folder'",
+      "echo 'Config folder should contain: .env and/or init.sh'"
+    ]
+  }
+
   # Copy GitHub Actions runner LaunchAgent
   provisioner "file" {
     source      = "../scripts/com.github.actions.runner.plist"
@@ -422,14 +452,22 @@ build {
       "echo '  - Switch version: sudo xcodes select <version>'",
       "echo '  - Current version: xcodebuild -version'",
       "echo ''",
-      "echo 'CI Runner Support:'",
-      "echo '  GitHub Actions: /Users/admin/actions-runner/maui-runner.sh'",
-      "echo '    Set GITHUB_ORG/GITHUB_TOKEN (and optional runner vars) before launching to auto-register'",
-      "echo '  Gitea Actions: /Users/admin/gitea-runner/gitea-runner.sh'",
-      "echo '    Set GITEA_INSTANCE_URL/GITEA_RUNNER_TOKEN before launching to auto-register'",
+      "echo 'CI Runner Support (auto-starts at boot):'",
+      "echo '  Configure with .env file:'",
+      "echo '    1. Create .env file with GITHUB_ORG/GITHUB_TOKEN or GITEA_INSTANCE_URL/GITEA_RUNNER_TOKEN'",
+      "echo '    2. tart run ${var.image_name} --dir config:/path/to/folder/with/.env'",
+      "echo '    3. Runners auto-start and register on boot'",
+      "echo ''",
+      "echo '  Custom initialization:'",
+      "echo '    Place init.sh in same folder as .env for custom startup logic'",
+      "echo ''",
+      "echo '  Manual runner execution:'",
+      "echo '    GitHub Actions: /Users/admin/actions-runner/maui-runner.sh'",
+      "echo '    Gitea Actions: /Users/admin/gitea-runner/gitea-runner.sh'",
       "echo ''",
       "echo 'To run: tart run ${var.image_name}'",
-      "echo 'To run with project: tart run ${var.image_name} --dir project:/path/to/your/project'"
+      "echo 'To run with project: tart run ${var.image_name} --dir project:/path/to/your/project'",
+      "echo 'To run with config: tart run ${var.image_name} --dir config:/path/to/config'"
     ]
   }
 }
