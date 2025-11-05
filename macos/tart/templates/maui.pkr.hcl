@@ -400,6 +400,26 @@ build {
     ]
   }
 
+  # Copy software manifest generation script
+  provisioner "file" {
+    source      = "../scripts/generate-software-manifest.sh"
+    destination = "/tmp/generate-software-manifest.sh"
+  }
+
+  # Generate installed software manifest
+  provisioner "shell" {
+    inline = [
+      "export PATH=\"/Users/admin/.dotnet:/Users/admin/.dotnet/tools:/usr/local/share/dotnet:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$$PATH\"",
+      "export DOTNET_ROOT=\"/Users/admin/.dotnet\"",
+      "export ANDROID_HOME=\"/Users/admin/Library/Android/sdk\"",
+      "export ANDROID_SDK_ROOT=\"/Users/admin/Library/Android/sdk\"",
+      "echo 'Generating installed software manifest...'",
+      "chmod +x /tmp/generate-software-manifest.sh",
+      "/tmp/generate-software-manifest.sh /usr/local/share/installed-software.md",
+      "echo 'Software manifest generated at /usr/local/share/installed-software.md'"
+    ]
+  }
+
   # Final cleanup and optimization
   provisioner "shell" {
     inline = [
@@ -464,6 +484,11 @@ build {
       "echo '  Manual runner execution:'",
       "echo '    GitHub Actions: /Users/admin/actions-runner/maui-runner.sh'",
       "echo '    Gitea Actions: /Users/admin/gitea-runner/gitea-runner.sh'",
+      "echo ''",
+      "echo 'Documentation:'",
+      "echo '  Installed software manifest: /usr/local/share/installed-software.md'",
+      "echo '  Build information: /usr/local/share/build-info.json'",
+      "echo '  Runner setup guide: See RUNNER-SETUP.md in repository'",
       "echo ''",
       "echo 'To run: tart run ${var.image_name}'",
       "echo 'To run with project: tart run ${var.image_name} --dir project:/path/to/your/project'",
