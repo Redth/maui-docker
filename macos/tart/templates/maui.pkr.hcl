@@ -226,16 +226,28 @@ build {
     timeout = "30m"
   }
 
-  # Install GitHub Actions runner helper script
+  # Copy GitHub Actions runner LaunchAgent
+  provisioner "file" {
+    source      = "../scripts/com.github.actions.runner.plist"
+    destination = "/tmp/com.github.actions.runner.plist"
+  }
+
+  # Install GitHub Actions runner helper script and LaunchAgent
   provisioner "shell" {
     inline = [
       "export PATH=\"/usr/bin:/bin:/usr/sbin:/sbin:$$PATH\"",
       "echo 'Installing GitHub Actions runner helper script...'",
       "mkdir -p /Users/admin/actions-runner",
+      "mkdir -p /Users/admin/Library/LaunchAgents",
+      "mkdir -p /Users/admin/Library/Logs",
       "mv /tmp/github-runner.sh /Users/admin/actions-runner/maui-runner.sh",
       "chown admin:staff /Users/admin/actions-runner/maui-runner.sh",
       "chmod +x /Users/admin/actions-runner/maui-runner.sh",
-      "echo 'Runner helper script installed at /Users/admin/actions-runner/maui-runner.sh'"
+      "mv /tmp/com.github.actions.runner.plist /Users/admin/Library/LaunchAgents/com.github.actions.runner.plist",
+      "chown admin:staff /Users/admin/Library/LaunchAgents/com.github.actions.runner.plist",
+      "chmod 644 /Users/admin/Library/LaunchAgents/com.github.actions.runner.plist",
+      "echo 'Runner helper script installed at /Users/admin/actions-runner/maui-runner.sh'",
+      "echo 'LaunchAgent installed - runner will auto-start at boot if GITHUB_ORG and GITHUB_TOKEN are set'"
     ]
   }
 
@@ -251,12 +263,22 @@ build {
     destination = "/tmp/install-gitea-runner.sh"
   }
 
-  # Install Gitea Actions runner
+  # Copy Gitea Actions runner LaunchAgent
+  provisioner "file" {
+    source      = "../scripts/com.gitea.actions.runner.plist"
+    destination = "/tmp/com.gitea.actions.runner.plist"
+  }
+
+  # Install Gitea Actions runner and LaunchAgent
   provisioner "shell" {
     inline = [
       "export PATH=\"/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$$PATH\"",
       "chmod +x /tmp/install-gitea-runner.sh",
-      "/tmp/install-gitea-runner.sh"
+      "/tmp/install-gitea-runner.sh",
+      "mv /tmp/com.gitea.actions.runner.plist /Users/admin/Library/LaunchAgents/com.gitea.actions.runner.plist",
+      "chown admin:staff /Users/admin/Library/LaunchAgents/com.gitea.actions.runner.plist",
+      "chmod 644 /Users/admin/Library/LaunchAgents/com.gitea.actions.runner.plist",
+      "echo 'LaunchAgent installed - Gitea runner will auto-start at boot if GITEA_INSTANCE_URL and GITEA_RUNNER_TOKEN are set'"
     ]
     timeout = "10m"
   }
