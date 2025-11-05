@@ -400,25 +400,34 @@ build {
     ]
   }
 
-  # Copy software manifest generation script
+  # Copy software manifest generation scripts
   provisioner "file" {
     source      = "../scripts/generate-software-manifest.sh"
     destination = "/tmp/generate-software-manifest.sh"
   }
 
-  # Generate installed software manifest
+  provisioner "file" {
+    source      = "../scripts/generate-software-manifest.json.sh"
+    destination = "/tmp/generate-software-manifest.json.sh"
+  }
+
+  # Generate installed software manifests (both markdown and JSON)
   provisioner "shell" {
     inline = [
       "export PATH=\"/Users/admin/.dotnet:/Users/admin/.dotnet/tools:/usr/local/share/dotnet:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$$PATH\"",
       "export DOTNET_ROOT=\"/Users/admin/.dotnet\"",
       "export ANDROID_HOME=\"/Users/admin/Library/Android/sdk\"",
       "export ANDROID_SDK_ROOT=\"/Users/admin/Library/Android/sdk\"",
-      "echo 'Generating installed software manifest...'",
+      "echo 'Generating installed software manifests...'",
       "chmod +x /tmp/generate-software-manifest.sh",
+      "chmod +x /tmp/generate-software-manifest.json.sh",
       "/tmp/generate-software-manifest.sh /usr/local/share/installed-software.md",
+      "/tmp/generate-software-manifest.json.sh /usr/local/share/installed-software.json",
       "ln -sf /usr/local/share/installed-software.md ~/installed-software.md",
-      "echo 'Software manifest generated at /usr/local/share/installed-software.md'",
-      "echo 'Symlink created at ~/installed-software.md for easy access'"
+      "ln -sf /usr/local/share/installed-software.json ~/installed-software.json",
+      "echo 'Software manifests generated:'",
+      "echo '  Markdown: /usr/local/share/installed-software.md (symlink: ~/installed-software.md)'",
+      "echo '  JSON: /usr/local/share/installed-software.json (symlink: ~/installed-software.json)'"
     ]
   }
 
@@ -488,7 +497,8 @@ build {
       "echo '    Gitea Actions: /Users/admin/gitea-runner/gitea-runner.sh'",
       "echo ''",
       "echo 'Documentation:'",
-      "echo '  Installed software manifest: ~/installed-software.md'",
+      "echo '  Installed software (human): ~/installed-software.md'",
+      "echo '  Installed software (machine): ~/installed-software.json'",
       "echo '  Build information: /usr/local/share/build-info.json'",
       "echo '  Runner setup guide: See RUNNER-SETUP.md in repository'",
       "echo ''",

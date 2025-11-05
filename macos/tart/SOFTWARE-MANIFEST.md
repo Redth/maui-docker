@@ -1,22 +1,24 @@
 # Software Manifest
 
-The MAUI Tart VM images include a comprehensive software manifest similar to [GitHub Actions runner images](https://github.com/actions/runner-images).
+The MAUI Tart VM images include comprehensive software manifests similar to [GitHub Actions runner images](https://github.com/actions/runner-images), available in both human-readable and machine-readable formats.
 
-## Location
+## Formats
 
-The software manifest is generated during the image build and saved to:
+### Markdown (Human-Readable)
 
-```
-/usr/local/share/installed-software.md
-```
+**Location:** `/usr/local/share/installed-software.md`
+**Symlink:** `~/installed-software.md`
 
-For convenience, a symlink is also created in the home directory:
+Formatted markdown document with detailed descriptions, examples, and expandable sections. Perfect for viewing in a terminal or browser.
 
-```
-~/installed-software.md
-```
+### JSON (Machine-Readable)
 
-Both paths point to the same file.
+**Location:** `/usr/local/share/installed-software.json`
+**Symlink:** `~/installed-software.json`
+
+Structured JSON document with the same information in a queryable format. Perfect for automation, CI/CD scripts, and programmatic access.
+
+Both formats contain identical information - choose based on your use case.
 
 ## Contents
 
@@ -114,19 +116,54 @@ The manifest follows the same markdown structure as GitHub Actions runner images
 ## Use Cases
 
 ### Verify Tool Availability
-Check if a specific tool or version is available before configuring CI/CD workflows:
 
+**Using Markdown:**
 ```bash
 ssh admin@$(tart ip maui-dev-tahoe-dotnet10.0) \
   "grep -A 5 'Node.js' ~/installed-software.md"
 ```
 
-### Troubleshooting
-When debugging build issues, check the exact versions installed:
+**Using JSON:**
+```bash
+ssh admin@$(tart ip maui-dev-tahoe-dotnet10.0) \
+  "jq '.languages.node' ~/installed-software.json"
+```
 
+### Troubleshooting
+
+**Using Markdown:**
 ```bash
 ssh admin@$(tart ip maui-dev-tahoe-dotnet10.0) \
   "grep -A 20 '## .NET' ~/installed-software.md"
+```
+
+**Using JSON:**
+```bash
+ssh admin@$(tart ip maui-dev-tahoe-dotnet10.0) \
+  "jq '.dotnet' ~/installed-software.json"
+```
+
+### Programmatic Queries
+
+The JSON format is ideal for automation:
+
+```bash
+# Check if a specific .NET workload is installed
+ssh admin@$(tart ip maui-dev-tahoe-dotnet10.0) \
+  "jq '.dotnet.workloads | contains([\"maui\"])' ~/installed-software.json"
+
+# Get all installed Xcode versions
+ssh admin@$(tart ip maui-dev-tahoe-dotnet10.0) \
+  "jq -r '.xcode.installedVersions[]' ~/installed-software.json"
+
+# Find a specific Homebrew package
+ssh admin@$(tart ip maui-dev-tahoe-dotnet10.0) \
+  "jq '.homebrewPackages[] | select(.name == \"git\")' ~/installed-software.json"
+
+# Check minimum tool version requirements
+ssh admin@$(tart ip maui-dev-tahoe-dotnet10.0) \
+  'jq -r ".languages.node" ~/installed-software.json | \
+   awk -F. "{if (\$1 >= 18) print \"OK\"; else print \"Version too old\"}"'
 ```
 
 ### Documentation
@@ -135,17 +172,91 @@ Reference the manifest in your project documentation to specify required VM imag
 ### Auditing
 Track what software is included in each image version for compliance or security auditing.
 
+## JSON Structure
+
+The JSON manifest follows this schema:
+
+```json
+{
+  "manifestVersion": "1.0",
+  "imageType": "maui-development",
+  "generatedAt": "2025-01-05T12:00:00Z",
+  "operatingSystem": {
+    "productVersion": "16.0",
+    "buildVersion": "25A123",
+    "kernelVersion": "25.0.0",
+    "architecture": "arm64"
+  },
+  "xcode": {
+    "defaultVersion": "26.0",
+    "defaultBuild": "26A123",
+    "installedVersions": ["26.0", "16.4"],
+    "sdks": ["iphoneos18.0", "macosx16.0", "appletvos18.0"]
+  },
+  "dotnet": {
+    "version": "10.0.100",
+    "sdks": [{"version": "10.0.100", "path": "..."}],
+    "runtimes": [{"name": "Microsoft.NETCore.App", "version": "10.0.0"}],
+    "workloads": ["maui", "wasm-tools"],
+    "globalTools": [{"name": "AndroidSdk.Tool", "version": "1.0.0"}]
+  },
+  "android": {
+    "sdkRoot": "/Users/admin/Library/Android/sdk",
+    "platforms": ["platforms;android-35", "platforms;android-34"],
+    "buildTools": ["build-tools;35.0.0", "build-tools;34.0.0"]
+  },
+  "languages": {
+    "node": "20.11.0",
+    "npm": "10.2.4",
+    "python": "3.12.1",
+    "ruby": "3.3.0",
+    "java": "17.0.10",
+    "git": "2.43.0"
+  },
+  "packageManagers": {
+    "homebrew": "4.2.0",
+    "gem": "3.5.3",
+    "cocoapods": "1.15.0"
+  },
+  "tools": {
+    "curl": "8.5.0",
+    "jq": "1.7.1",
+    "gh": "2.42.0"
+  },
+  "homebrewPackages": [
+    {"name": "git", "version": "2.43.0"},
+    {"name": "node", "version": "20.11.0"}
+  ],
+  "environmentVariables": {
+    "DOTNET_ROOT": "/Users/admin/.dotnet",
+    "ANDROID_HOME": "~/Library/Android/sdk"
+  },
+  "ciRunners": {
+    "githubActions": {
+      "scriptPath": "/Users/admin/actions-runner/maui-runner.sh",
+      "autoStart": true
+    },
+    "giteaActions": {
+      "scriptPath": "/Users/admin/gitea-runner/gitea-runner.sh",
+      "autoStart": true
+    }
+  },
+  "buildInfo": { /* contents of build-info.json */ }
+}
+```
+
 ## Comparison with GitHub Actions
 
 Like GitHub's hosted runners, our manifests provide:
 - ✅ Complete software inventory
 - ✅ Version information for all tools
 - ✅ Environment variable documentation
-- ✅ Expandable sections for detailed listings
+- ✅ Machine-readable JSON format
 - ✅ Build date and base image tracking
 
 Unlike GitHub's runners:
 - Our manifests are generated inside the VM (not in a separate repository)
+- We provide both markdown and JSON formats
 - We focus on MAUI/.NET development tools
 - We include Tart/VM-specific information
 - We document multiple CI runner support (GitHub + Gitea)
