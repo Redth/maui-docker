@@ -13,32 +13,10 @@ CONFIG_DIR="/Volumes/My Shared Files/config"
 ENV_FILE="${CONFIG_DIR}/.env"
 INIT_SCRIPT="${CONFIG_DIR}/init.sh"
 
-# Read .env file and set environment variables via launchctl
+# Check if .env file exists (runner scripts will load it themselves)
 if [[ -f "${ENV_FILE}" ]]; then
-  log "Found .env file at ${ENV_FILE}, loading environment variables"
-
-  # Read each line and set as environment variable
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    # Skip empty lines and comments
-    [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
-
-    # Parse KEY=VALUE format
-    if [[ "$line" =~ ^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]]; then
-      key="${BASH_REMATCH[1]}"
-      value="${BASH_REMATCH[2]}"
-
-      # Remove surrounding quotes if present
-      value="${value#\"}"
-      value="${value%\"}"
-      value="${value#\'}"
-      value="${value%\'}"
-
-      log "Setting environment variable: ${key}"
-      launchctl setenv "${key}" "${value}"
-    fi
-  done < "${ENV_FILE}"
-
-  log "Environment variables loaded successfully"
+  log "Found .env file at ${ENV_FILE}"
+  log "Runner scripts will load environment variables from this file"
 else
   log "No .env file found at ${ENV_FILE}"
   log "To configure runners, mount a directory with .env file:"

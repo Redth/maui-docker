@@ -6,6 +6,31 @@ log() {
   echo "[gitea-runner] $*"
 }
 
+# Load environment variables from .env file if mounted
+ENV_FILE="/Volumes/My Shared Files/config/.env"
+if [[ -f "${ENV_FILE}" ]]; then
+  log "Loading environment variables from ${ENV_FILE}"
+  set +u  # Temporarily allow unset variables
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    # Skip empty lines and comments
+    [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+
+    # Export KEY=VALUE format
+    if [[ "$line" =~ ^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]]; then
+      key="${BASH_REMATCH[1]}"
+      value="${BASH_REMATCH[2]}"
+      # Remove surrounding quotes
+      value="${value#\"}"
+      value="${value%\"}"
+      value="${value#\'}"
+      value="${value%\'}"
+      export "${key}=${value}"
+    fi
+  done < "${ENV_FILE}"
+  set -u  # Re-enable unset variable check
+  log "Environment variables loaded from .env file"
+fi
+
 GITEA_INSTANCE_URL=${GITEA_INSTANCE_URL:-""}
 GITEA_RUNNER_TOKEN=${GITEA_RUNNER_TOKEN:-""}
 GITEA_RUNNER_NAME=${GITEA_RUNNER_NAME:-""}
