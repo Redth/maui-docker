@@ -416,7 +416,9 @@ build {
       "echo 'Generating installed software manifest...'",
       "chmod +x /tmp/generate-software-manifest.sh",
       "/tmp/generate-software-manifest.sh /usr/local/share/installed-software.md",
-      "echo 'Software manifest generated at /usr/local/share/installed-software.md'"
+      "ln -sf /usr/local/share/installed-software.md ~/installed-software.md",
+      "echo 'Software manifest generated at /usr/local/share/installed-software.md'",
+      "echo 'Symlink created at ~/installed-software.md for easy access'"
     ]
   }
 
@@ -486,7 +488,7 @@ build {
       "echo '    Gitea Actions: /Users/admin/gitea-runner/gitea-runner.sh'",
       "echo ''",
       "echo 'Documentation:'",
-      "echo '  Installed software manifest: /usr/local/share/installed-software.md'",
+      "echo '  Installed software manifest: ~/installed-software.md'",
       "echo '  Build information: /usr/local/share/build-info.json'",
       "echo '  Runner setup guide: See RUNNER-SETUP.md in repository'",
       "echo ''",

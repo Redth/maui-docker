@@ -10,6 +10,14 @@ The software manifest is generated during the image build and saved to:
 /usr/local/share/installed-software.md
 ```
 
+For convenience, a symlink is also created in the home directory:
+
+```
+~/installed-software.md
+```
+
+Both paths point to the same file.
+
 ## Contents
 
 The manifest includes detailed information about:
@@ -51,11 +59,14 @@ Information about GitHub Actions and Gitea Actions runner capabilities
 # SSH into the VM
 ssh admin@$(tart ip maui-dev-tahoe-dotnet10.0)
 
-# View the manifest
-cat /usr/local/share/installed-software.md
+# View the manifest (easy path in home directory)
+cat ~/installed-software.md
 
 # Or open in less for easier navigation
-less /usr/local/share/installed-software.md
+less ~/installed-software.md
+
+# Or use the full path
+cat /usr/local/share/installed-software.md
 ```
 
 ### From the Host
@@ -66,8 +77,8 @@ tart run maui-dev-tahoe-dotnet10.0 &
 sleep 10
 VM_IP=$(tart ip maui-dev-tahoe-dotnet10.0)
 
-# Copy manifest to host
-scp admin@${VM_IP}:/usr/local/share/installed-software.md ./
+# Copy manifest to host (using convenient home directory path)
+scp admin@${VM_IP}:installed-software.md ./
 
 # View locally
 cat installed-software.md
@@ -107,7 +118,7 @@ Check if a specific tool or version is available before configuring CI/CD workfl
 
 ```bash
 ssh admin@$(tart ip maui-dev-tahoe-dotnet10.0) \
-  "grep -A 5 'Node.js' /usr/local/share/installed-software.md"
+  "grep -A 5 'Node.js' ~/installed-software.md"
 ```
 
 ### Troubleshooting
@@ -115,7 +126,7 @@ When debugging build issues, check the exact versions installed:
 
 ```bash
 ssh admin@$(tart ip maui-dev-tahoe-dotnet10.0) \
-  "grep -A 20 '## .NET' /usr/local/share/installed-software.md"
+  "grep -A 20 '## .NET' ~/installed-software.md"
 ```
 
 ### Documentation
