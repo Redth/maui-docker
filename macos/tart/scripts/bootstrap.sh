@@ -62,6 +62,22 @@ else
 fi
 
 log "Bootstrap initialization complete"
-log "Runners will now attempt to start based on configured environment variables"
+
+# Manually load runner LaunchAgents so they inherit the environment variables we just set
+# These agents should NOT have RunAtLoad=true - they're loaded on-demand by bootstrap
+GITHUB_RUNNER_PLIST="${HOME}/Library/LaunchAgents/com.github.actions.runner.plist"
+GITEA_RUNNER_PLIST="${HOME}/Library/LaunchAgents/com.gitea.actions.runner.plist"
+
+if [[ -f "${GITHUB_RUNNER_PLIST}" ]]; then
+  log "Loading GitHub Actions runner LaunchAgent"
+  launchctl load "${GITHUB_RUNNER_PLIST}" 2>/dev/null || log "GitHub runner LaunchAgent already loaded or failed to load"
+fi
+
+if [[ -f "${GITEA_RUNNER_PLIST}" ]]; then
+  log "Loading Gitea Actions runner LaunchAgent"
+  launchctl load "${GITEA_RUNNER_PLIST}" 2>/dev/null || log "Gitea runner LaunchAgent already loaded or failed to load"
+fi
+
+log "Runners started (if configured)"
 
 exit 0
