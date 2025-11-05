@@ -68,7 +68,7 @@ else
 fi
 
 log "Requesting registration token from '${REGISTRATION_ENDPOINT}'"
-REG_TOKEN=$(curl -fsSL \
+REG_TOKEN=$(curl -fsSL -X POST \
   -H "Authorization: Bearer ${GITHUB_TOKEN}" \
   -H "Accept: application/vnd.github+json" \
   "${REGISTRATION_ENDPOINT}" | jq -r '.token // empty')
