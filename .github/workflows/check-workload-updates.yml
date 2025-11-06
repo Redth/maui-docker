@@ -64,7 +64,8 @@ jobs:
         script: |
           const workloadVersion = '${{ needs.check-updates.outputs.workload-set-version }}';
 
-          console.log(`Triggering build-all workflow for workload set version: ${workloadVersion}`);
+          console.log(`Triggering build-all workflow - detected workload update: ${workloadVersion}`);
+          console.log('Note: Each .NET version will auto-detect its appropriate workload version');
 
           try {
             await github.rest.actions.createWorkflowDispatch({
@@ -73,7 +74,6 @@ jobs:
               workflow_id: 'build-all.yml',
               ref: 'main',
               inputs: {
-                workload_set_version: workloadVersion,
                 force_build: '${{ needs.check-updates.outputs.force-build }}'
               }
             });
@@ -88,7 +88,6 @@ jobs:
               repo: context.repo.repo,
               event_type: 'trigger-build-all',
               client_payload: {
-                workload_set_version: workloadVersion,
                 force_build: '${{ needs.check-updates.outputs.force-build }}'
               }
             });
@@ -110,8 +109,8 @@ jobs:
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
-          const workloadVersion = '${{ needs.check-updates.outputs.workload-set-version }}';
-          console.log(`Triggering Tart VM build for .NET ${{ matrix.dotnet_channel }} with workload version: ${workloadVersion}`);
+          console.log(`Triggering Tart VM build for .NET ${{ matrix.dotnet_channel }}`);
+          console.log('Note: .NET ${{ matrix.dotnet_channel }} will auto-detect its appropriate workload version');
 
           try {
             await github.rest.actions.createWorkflowDispatch({
@@ -121,7 +120,6 @@ jobs:
               ref: 'main',
               inputs: {
                 dotnet_channel: '${{ matrix.dotnet_channel }}',
-                workload_set_version: workloadVersion,
                 image_type: 'maui',
                 force_build: '${{ needs.check-updates.outputs.force-build }}'
               }
