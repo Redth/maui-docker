@@ -3,6 +3,27 @@ set -e
 
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 
+ensure_required_runtimes() {
+  if ! command -v xcodes >/dev/null 2>&1; then
+    echo "Warning: xcodes CLI not available; skipping runtime installation"
+    return
+  fi
+
+  echo "Ensuring required iOS and tvOS runtimes are installed via xcodes..."
+  REQUIRED_RUNTIMES="iOS tvOS"
+  for runtime in $REQUIRED_RUNTIMES; do
+    echo "Checking runtime: $runtime"
+    if xcodes runtimes | grep -q "$runtime (Installed)"; then
+      echo "Runtime $runtime already installed"
+    else
+      echo "Installing runtime $runtime (latest available)..."
+      if ! sudo xcodes runtimes install --latest "$runtime"; then
+        echo "Warning: Failed to install runtime $runtime (may require Apple ID or be unavailable)."
+      fi
+    fi
+  done
+}
+
 ADDITIONAL_XCODES="$1"
 
 if [ -n "$ADDITIONAL_XCODES" ]; then
@@ -32,3 +53,5 @@ if [ -n "$ADDITIONAL_XCODES" ]; then
 else
   echo "No additional Xcode versions to install"
 fi
+
+ensure_required_runtimes

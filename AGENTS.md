@@ -1,23 +1,32 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-Docker definitions live in three sibling folders. `base/` owns the MAUI development images, split into `linux/` and `windows/` contexts with shared helpers in `base-build.ps1`. `runner/` layers the GitHub Actions runner service onto those images via platform-specific subfolders. `test/` contains the Appium-enabled Android emulator image plus `run.ps1` for local smoke runs. Shared PowerShell helpers sit in `common-functions.ps1`, while `_temp/` holds scratch artifacts generated during builds.
+- `base/` hosts MAUI development images; use `linux/` and `windows/` subfolders plus shared helpers in `base/base-build.ps1`.
+- `runner/` layers GitHub Actions runners on top of the base images with platform-specific contexts.
+- `test/` builds the Appium-enabled Android emulator image; `run.ps1` performs local smoke runs.
+- Shared PowerShell utilities sit in `common-functions.ps1`; transient build artifacts land in `_temp/`.
 
 ## Build, Test, and Development Commands
-Use PowerShell (Core or Windows) to invoke the scripted entry points:
-- `pwsh base/base-build.ps1 -DockerPlatform linux/amd64 -Version <tag>` builds the base image and tags it for Linux.
-- `pwsh runner/runner-build.ps1 -DockerPlatform windows/amd64 -Version <tag> -Push` emits the runner image and optionally pushes it.
-- `pwsh test/build.ps1 -AndroidSdkApiLevel 35 -Load` produces the emulator test image and keeps it locally loaded.
-- `pwsh test/run.ps1 -AndroidSdkApiLevel 35` launches the container with Appium, ADB, and emulator ports mapped for manual validation.
+- `pwsh base/base-build.ps1 -DockerPlatform linux/amd64 -Version <tag>` builds and tags the Linux base image.
+- `pwsh runner/runner-build.ps1 -DockerPlatform windows/amd64 -Version <tag> [-Push]` produces the runner image and optionally pushes it.
+- `pwsh test/build.ps1 -AndroidSdkApiLevel 35 [-Load]` prepares the Android emulator image; add `-Load` to keep it locally.
+- `pwsh test/run.ps1 -AndroidSdkApiLevel 35` starts the emulator container with Appium and ADB ports exposed.
 
 ## Coding Style & Naming Conventions
-PowerShell scripts start with a `Param` block and use PascalCase parameter names, four-space indentation, and splatted arrays for longer command invocations. Guard shared imports with `Join-Path` plus `Test-Path` as in `base/base-build.ps1:18`, and keep helper functions in `common-functions.ps1`. Dockerfiles should keep instructions uppercase, group related `RUN` steps, and expose configurable values via `ARG`/`ENV` pairs so CI callers can override them.
+- PowerShell scripts begin with `Param` blocks, use PascalCase parameter names, and four-space indentation.
+- Prefer splatted hashtables for longer command invocations and guard shared imports with `Join-Path` + `Test-Path`.
+- Dockerfiles keep uppercase instructions, group related `RUN` steps, and expose overrides through paired `ARG` and `ENV` values.
 
 ## Testing Guidelines
-Container changes should be validated by rebuilding the affected image and exercising a smoke scenario. For Android tooling updates, run `pwsh test/build.ps1` followed by `pwsh test/run.ps1` and confirm the emulator, ADB, and Appium endpoints respond. When altering shared helpers, run at least one Linux and one Windows build path to ensure workload discovery still succeeds. Mirror the existing verb-based naming (`build.ps1`, `run.ps1`) for new test utilities.
+- Rebuild the affected image before merging; follow with `test/run.ps1` to verify emulator, ADB, and Appium endpoints.
+- When editing shared helpers, execute at least one Linux and one Windows build path to confirm tool discovery.
+- Keep test utilities in verb-form (`build.ps1`, `run.ps1`) and mirror existing naming when adding scripts.
 
 ## Commit & Pull Request Guidelines
-Commits use short, imperative subjects ("Add claude instructions", "Fix version format") and avoid trailing punctuation. Keep related Docker and script changes together and document version bumps in the body when needed. Pull requests should describe the image families touched, note required environment variables (such as `GITHUB_TOKEN` for runners), and include before/after build or runtime logs if behavior changed.
+- Write imperative commit subjects without trailing punctuation (e.g., "Update Android SDK cache").
+- Group related Dockerfile and script updates in the same commit and explain version bumps in the body.
+- Pull requests must list touched image families, required env vars (e.g., `GITHUB_TOKEN`, `RUNNER_NAME`), and include relevant build or runtime logs.
 
 ## Security & Configuration Tips
-Do not bake personal tokens into Dockerfiles or scripts; rely on runtime environment variables like `GITHUB_TOKEN`, `RUNNER_NAME`, and `INIT_PWSH_SCRIPT`. When testing locally, prefer binding secrets through `--env-file` or volume-mounted config rather than editing tracked files.
+- Do not bake credentials into images; supply secrets at runtime via `--env-file` or mounted configuration.
+- Prefer environment variables such as `INIT_PWSH_SCRIPT` for runtime customization and keep `_temp/` out of version control.

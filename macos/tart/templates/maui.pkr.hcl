@@ -368,19 +368,19 @@ build {
       "{",
       "  \"image_type\": \"maui\",",
       "  \"macos_version\": \"${var.macos_version}\",",
-      "  \"build_date\": \"$$(date -u +%Y-%m-%dT%H:%M:%SZ)\",",
+      "  \"build_date\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",",
       "  \"dotnet_channel\": \"${var.dotnet_channel}\",",
       "  \"base_xcode_version\": \"${var.base_xcode_version}\",",
       "  \"additional_xcode_versions\": \"${var.additional_xcode_versions}\",",
       "  \"tools\": {",
-      "    \"dotnet\": \"$$(dotnet --version)\",",
-      "    \"xcode\": \"$$(xcodebuild -version | head -1)\",",
-      "    \"git\": \"$$(git --version)\",",
-      "    \"node\": \"$$(node --version 2>/dev/null || echo 'not installed')\",",
-      "    \"npm\": \"$$(npm --version 2>/dev/null || echo 'not installed')\",",
-      "    \"gh\": \"$$(gh --version 2>/dev/null | head -1 || echo 'not installed')\",",
-      "    \"fastlane\": \"$$(fastlane --version 2>/dev/null || echo 'not installed')\",",
-      "    \"act_runner\": \"$$(/Users/admin/gitea-runner/act_runner --version 2>/dev/null || echo 'not installed')\"",
+      "    \"dotnet\": \"$(dotnet --version)\",",
+      "    \"xcode\": \"$(xcodebuild -version | head -1)\",",
+      "    \"git\": \"$(git --version)\",",
+      "    \"node\": \"$(node --version 2>/dev/null || echo 'not installed')\",",
+      "    \"npm\": \"$(npm --version 2>/dev/null || echo 'not installed')\",",
+      "    \"gh\": \"$(gh --version 2>/dev/null | head -1 || echo 'not installed')\",",
+      "    \"fastlane\": \"$(fastlane --version 2>/dev/null || echo 'not installed')\",",
+      "    \"act_runner\": \"$(/Users/admin/gitea-runner/act_runner --version 2>/dev/null || echo 'not installed')\"",
       "  },",
       "  \"capabilities\": [",
       "    \"ios-build\",",
@@ -392,7 +392,7 @@ build {
       "    \"automated-testing\",",
       "    \"multiple-xcode-versions\"",
       "  ],",
-      "  \"workloads\": $$(dotnet workload list --machine-readable 2>/dev/null || echo '[]')",
+      "  \"workloads\": $(dotnet workload list --machine-readable 2>/dev/null || echo '[]')",
       "}",
       "EOF",
       "sudo mv /tmp/build-info.json /usr/local/share/build-info.json",
@@ -411,7 +411,17 @@ build {
     destination = "/tmp/generate-software-manifest.json.sh"
   }
 
-  # Generate installed software manifests (both markdown and JSON)
+  provisioner "file" {
+    source      = "../scripts/generate-software-manifest-spdx.sh"
+    destination = "/tmp/generate-software-manifest-spdx.sh"
+  }
+
+  provisioner "file" {
+    source      = "../scripts/generate-software-manifest-cyclonedx.sh"
+    destination = "/tmp/generate-software-manifest-cyclonedx.sh"
+  }
+
+  # Generate installed software manifests (markdown, JSON, SPDX, and CycloneDX)
   provisioner "shell" {
     inline = [
       "export PATH=\"/Users/admin/.dotnet:/Users/admin/.dotnet/tools:/usr/local/share/dotnet:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$$PATH\"",
@@ -421,13 +431,36 @@ build {
       "echo 'Generating installed software manifests...'",
       "chmod +x /tmp/generate-software-manifest.sh",
       "chmod +x /tmp/generate-software-manifest.json.sh",
+      "chmod +x /tmp/generate-software-manifest-spdx.sh",
+      "chmod +x /tmp/generate-software-manifest-cyclonedx.sh",
       "/tmp/generate-software-manifest.sh /usr/local/share/installed-software.md",
       "/tmp/generate-software-manifest.json.sh /usr/local/share/installed-software.json",
+      "/tmp/generate-software-manifest-spdx.sh /usr/local/share/installed-software.json /usr/local/share/installed-software.spdx.json",
+      "/tmp/generate-software-manifest-cyclonedx.sh /usr/local/share/installed-software.json /usr/local/share/installed-software.cdx.json",
       "ln -sf /usr/local/share/installed-software.md ~/installed-software.md",
       "ln -sf /usr/local/share/installed-software.json ~/installed-software.json",
+      "ln -sf /usr/local/share/installed-software.spdx.json ~/installed-software.spdx.json",
+      "ln -sf /usr/local/share/installed-software.cdx.json ~/installed-software.cdx.json",
       "echo 'Software manifests generated:'",
       "echo '  Markdown: /usr/local/share/installed-software.md (symlink: ~/installed-software.md)'",
-      "echo '  JSON: /usr/local/share/installed-software.json (symlink: ~/installed-software.json)'"
+      "echo '  JSON: /usr/local/share/installed-software.json (symlink: ~/installed-software.json)'",
+      "echo '  SPDX 2.3: /usr/local/share/installed-software.spdx.json (symlink: ~/installed-software.spdx.json)'",
+      "echo '  CycloneDX 1.6: /usr/local/share/installed-software.cdx.json (symlink: ~/installed-software.cdx.json)'"
+    ]
+  }
+
+  # Customize desktop for clean development environment
+  provisioner "file" {
+    source      = "../scripts/customize-desktop.sh"
+    destination = "/tmp/customize-desktop.sh"
+  }
+
+  provisioner "shell" {
+    inline = [
+      "echo 'Customizing desktop environment...'",
+      "chmod +x /tmp/customize-desktop.sh",
+      "/tmp/customize-desktop.sh",
+      "echo 'Desktop customization completed'"
     ]
   }
 

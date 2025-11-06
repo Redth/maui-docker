@@ -114,5 +114,21 @@ RUN android sdk list --installed --format=json > /home/mauiusr/sdk_list.json
 # Accept Android Licenses
 RUN android sdk accept-licenses --force --home="${ANDROID_HOME}"
 
+# Copy software manifest generation scripts
+USER root
+COPY scripts/generate-software-manifest.json.sh /tmp/generate-software-manifest.json.sh
+COPY scripts/generate-software-manifest-spdx.sh /tmp/generate-software-manifest-spdx.sh
+COPY scripts/generate-software-manifest-cyclonedx.sh /tmp/generate-software-manifest-cyclonedx.sh
+RUN chmod +x /tmp/generate-software-manifest.json.sh \
+    && chmod +x /tmp/generate-software-manifest-spdx.sh \
+    && chmod +x /tmp/generate-software-manifest-cyclonedx.sh
+
+# Generate software manifests (JSON, SPDX, CycloneDX)
+USER 1400:1401
+RUN mkdir -p /usr/local/share || true
+RUN /tmp/generate-software-manifest.json.sh /usr/local/share/installed-software.json || echo "JSON manifest generation failed"
+RUN /tmp/generate-software-manifest-spdx.sh /usr/local/share/installed-software.json /usr/local/share/installed-software.spdx.json || echo "SPDX manifest generation failed"
+RUN /tmp/generate-software-manifest-cyclonedx.sh /usr/local/share/installed-software.json /usr/local/share/installed-software.cdx.json || echo "CycloneDX manifest generation failed"
+
 # Default command - just keep the container running
 CMD ["tail", "-f", "/dev/null"]

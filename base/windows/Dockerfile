@@ -66,5 +66,16 @@ RUN android sdk accept-licenses --force --home="$env:ANDROID_HOME"
 # Copy the init script
 COPY scripts/init.ps1 C:/init.ps1
 
+# Copy software manifest generation scripts
+COPY scripts/Generate-SoftwareManifest.ps1 C:/temp/Generate-SoftwareManifest.ps1
+COPY scripts/Generate-SpdxManifest.ps1 C:/temp/Generate-SpdxManifest.ps1
+COPY scripts/Generate-CycloneDxManifest.ps1 C:/temp/Generate-CycloneDxManifest.ps1
+
+# Generate software manifests (JSON, SPDX, CycloneDX)
+RUN New-Item -ItemType Directory -Path C:/ProgramData -Force -ErrorAction SilentlyContinue; \
+    & C:/temp/Generate-SoftwareManifest.ps1 -OutputFile C:/ProgramData/installed-software.json; \
+    & C:/temp/Generate-SpdxManifest.ps1 -SourceJson C:/ProgramData/installed-software.json -OutputFile C:/ProgramData/installed-software.spdx.json; \
+    & C:/temp/Generate-CycloneDxManifest.ps1 -SourceJson C:/ProgramData/installed-software.json -OutputFile C:/ProgramData/installed-software.cdx.json
+
 # Default command - just keep the container running
 CMD ["powershell", "while ($true) { Start-Sleep -Seconds 30 }"]
