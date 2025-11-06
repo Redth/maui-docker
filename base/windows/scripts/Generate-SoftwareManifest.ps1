@@ -31,11 +31,12 @@ try {
         architecture = $osInfo.OSArchitecture
     }
 } catch {
+    $architecture = if ([System.Environment]::Is64BitOperatingSystem) { "64-bit" } else { "32-bit" }
     $manifest.operatingSystem = @{
         productName = "Windows Server"
         version = "unknown"
         buildLab = "unknown"
-        architecture = [System.Environment]::Is64BitOperatingSystem ? "64-bit" : "32-bit"
+        architecture = $architecture
     }
 }
 
