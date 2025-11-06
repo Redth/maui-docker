@@ -34,9 +34,12 @@ RUN mkdir gitea-runner
 WORKDIR /home/mauiusr/gitea-runner
 
 # Download the latest Gitea act_runner
-RUN LATEST_VERSION=$(curl -fsSL https://gitea.com/api/v1/repos/gitea/act_runner/releases | jq -r '.[0].tag_name') && \
-    echo "Downloading act_runner version: $LATEST_VERSION" && \
-    curl -fsSL "https://dl.gitea.com/act_runner/${LATEST_VERSION}/act_runner-${LATEST_VERSION}-linux-amd64" -o act_runner && \
+RUN set -euo pipefail && \
+    LATEST_VERSION=$(curl -fsSL https://gitea.com/api/v1/repos/gitea/act_runner/releases | jq -r '.[0].tag_name') && \
+    VERSION_NO_PREFIX="${LATEST_VERSION#v}" && \
+    DOWNLOAD_URL="https://gitea.com/gitea/act_runner/releases/download/${LATEST_VERSION}/act_runner-${VERSION_NO_PREFIX}-linux-amd64" && \
+    echo "Downloading act_runner version: ${LATEST_VERSION} from ${DOWNLOAD_URL}" && \
+    curl -fsSL "${DOWNLOAD_URL}" -o act_runner && \
     chmod +x act_runner
 
 # Default command
