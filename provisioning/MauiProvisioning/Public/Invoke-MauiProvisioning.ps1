@@ -382,12 +382,33 @@ function Invoke-MauiProvisioning {
             Write-Host "Android SDK base components already present at $androidHomeResolved"
         }
 
-        $androidPackagesToEnsure = @(
-            "platform-tools",
-            "build-tools;$($androidDetails.BuildToolsVersion)",
-            "cmdline-tools;$($androidDetails.CmdLineToolsVersion)",
-            "platforms;android-$($androidDetails.ApiLevel)"
-        )
+        $androidPackagesToEnsure = @()
+        if ($androidDetails.Packages) {
+            $androidRequiredPackages = $androidDetails.Packages | Where-Object { -not $_.Optional } | ForEach-Object { $_.Id }
+            $androidOptionalPackages = $androidDetails.Packages | Where-Object { $_.Optional } | ForEach-Object { $_.Id }
+
+            if ($androidRequiredPackages.Count -gt 0) {
+                Write-Host "Ensuring required Android SDK packages: $($androidRequiredPackages -join ', ')"
+                $androidPackagesToEnsure += $androidRequiredPackages
+            }
+
+            if ($androidOptionalPackages.Count -gt 0) {
+                Write-Host "Ensuring optional Android SDK packages: $($androidOptionalPackages -join ', ')"
+                $androidPackagesToEnsure += $androidOptionalPackages
+            }
+
+            $androidPackagesToEnsure = $androidPackagesToEnsure | Where-Object { $_ } | Select-Object -Unique
+        }
+
+        if (-not $androidPackagesToEnsure -or $androidPackagesToEnsure.Count -eq 0) {
+            $androidPackagesToEnsure = @(
+                "platform-tools",
+                "build-tools;$($androidDetails.BuildToolsVersion)",
+                "cmdline-tools;$($androidDetails.CmdLineToolsVersion)",
+                "platforms;android-$($androidDetails.ApiLevel)"
+            )
+            Write-Host "Android workload metadata missing package list; falling back to required defaults: $($androidPackagesToEnsure -join ', ')"
+        }
 
         foreach ($packageId in $androidPackagesToEnsure) {
             Ensure-AndroidPackage -PackageId $packageId -InstalledPackages $installedAndroidPackages -ChangesMade ([ref]$androidChangesMade) -AndroidHome $androidHomeResolved
