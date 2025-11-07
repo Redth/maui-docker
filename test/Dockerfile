@@ -1,3 +1,15 @@
+# Test Image for Android Emulator and Appium Testing
+#
+# This image is designed for running Android emulators and Appium tests.
+# It does NOT include .NET MAUI workloads since no MAUI building happens on this image.
+# The primary purpose is to provide a quick emulator for the specified API level.
+#
+# Key Features:
+# - Android Emulator for the specified API level (via ANDROID_SDK_API_LEVEL build arg)
+# - Appium Server with UIAutomator2 driver pre-installed
+# - Automatic service startup on container launch
+# - Support for nested virtualization (requires --device /dev/kvm)
+
 # Use .NET SDK base image
 FROM mcr.microsoft.com/dotnet/sdk:9.0-noble AS env-builder
 
