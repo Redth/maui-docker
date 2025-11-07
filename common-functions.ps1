@@ -552,7 +552,7 @@ function Get-AndroidWorkloadInfo {
             Write-Host "Selected system image type: $systemImageType, architecture: $systemImageArch"
         }
         
-        $avdDeviceType = "nexus_5" # Default device type
+        $avdDeviceType = "Nexus 5" # Default device type
         
         Write-Host "Selected AVD device type: $avdDeviceType"
     }
