@@ -10,19 +10,19 @@ packer {
 variable "image_name" {
   type        = string
   description = "Name for the output image"
-  default     = "maui-dev-sequoia"
+  default     = "maui-dev-tahoe"
 }
 
 variable "base_image" {
   type        = string
   description = "Base Tart image to build from"
-  default     = "ghcr.io/cirruslabs/macos-sequoia-xcode:16.4"
+  default     = "ghcr.io/cirruslabs/macos-tahoe-xcode:26"
 }
 
 variable "macos_version" {
   type        = string
   description = "macOS version"
-  default     = "sequoia"
+  default     = "tahoe"
 }
 
 variable "dotnet_channel" {
@@ -473,6 +473,9 @@ build {
       "sudo rm -rf /var/tmp/*",
       "sudo rm -rf /var/log/*",
       "rm -rf ~/Library/Developer/Xcode/DerivedData/*",
+      "rm -rf ~/Library/Caches/*",
+      "rm -rf /Users/admin/android-sdk",
+      "rm -rf /Users/admin/flutter",
       "echo 'Cleanup completed'"
     ]
   }
