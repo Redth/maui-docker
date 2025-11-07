@@ -34,13 +34,19 @@ RUN mkdir gitea-runner
 WORKDIR /home/mauiusr/gitea-runner
 
 # Download the latest Gitea act_runner
-RUN set -euo pipefail && \
-    LATEST_VERSION=$(curl -fsSL https://gitea.com/api/v1/repos/gitea/act_runner/releases | jq -r '.[0].tag_name') && \
-    VERSION_NO_PREFIX="${LATEST_VERSION#v}" && \
-    DOWNLOAD_URL="https://gitea.com/gitea/act_runner/releases/download/${LATEST_VERSION}/act_runner-${VERSION_NO_PREFIX}-linux-amd64" && \
-    echo "Downloading act_runner version: ${LATEST_VERSION} from ${DOWNLOAD_URL}" && \
-    curl -fsSL "${DOWNLOAD_URL}" -o act_runner && \
-    chmod +x act_runner
+COPY <<'EOF_SCRIPT' /tmp/install-act-runner.sh
+#!/bin/sh
+set -eu
+
+LATEST_VERSION=$(curl -fsSL https://gitea.com/api/v1/repos/gitea/act_runner/releases | jq -r '.[0].tag_name')
+VERSION_NO_PREFIX=${LATEST_VERSION#v}
+DOWNLOAD_URL="https://gitea.com/gitea/act_runner/releases/download/${LATEST_VERSION}/act_runner-${VERSION_NO_PREFIX}-linux-amd64"
+echo "Downloading act_runner version: ${LATEST_VERSION} from ${DOWNLOAD_URL}"
+curl -fsSL "${DOWNLOAD_URL}" -o /home/mauiusr/gitea-runner/act_runner
+chmod +x /home/mauiusr/gitea-runner/act_runner
+EOF_SCRIPT
+
+RUN chmod +x /tmp/install-act-runner.sh && /tmp/install-act-runner.sh && rm -f /tmp/install-act-runner.sh
 
 # Default command
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
