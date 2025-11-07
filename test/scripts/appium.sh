@@ -5,4 +5,4 @@ appium \
   --log-level debug \
   --log-timestamp \
   --port 4723 \
-  --allow-insecure chromedriver_autodownload
+  --allow-insecure *:chromedriver_autodownload
