@@ -10,14 +10,17 @@
 # - Automatic service startup on container launch
 # - Support for nested virtualization (requires --device /dev/kvm)
 
+# Set .NET version build arg (supports 9.0, 10.0, etc.)
+ARG DOTNET_VERSION=9.0
+
 # Use .NET SDK base image
-FROM mcr.microsoft.com/dotnet/sdk:9.0-noble AS env-builder
+FROM mcr.microsoft.com/dotnet/sdk:${DOTNET_VERSION}-noble AS env-builder
 
 # Install Android SDK Tool
 RUN dotnet tool install -g AndroidSdk.Tool
 
 # Start the main image
-FROM mcr.microsoft.com/dotnet/runtime:9.0-noble
+FROM mcr.microsoft.com/dotnet/runtime:${DOTNET_VERSION}-noble
 
 # Set build arguments
 ARG TARGETARCH
