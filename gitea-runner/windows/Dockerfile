@@ -24,7 +24,7 @@ RUN $releases = Invoke-RestMethod -Uri 'https://gitea.com/api/v1/repos/gitea/act
     $latestVersion = $releases[0].tag_name ; \
     $versionNoPrefix = if ($latestVersion.StartsWith('v')) { $latestVersion.Substring(1) } else { $latestVersion } ; \
     Write-Host "Downloading act_runner version: $latestVersion" ; \
-    $downloadUrl = "https://gitea.com/gitea/act_runner/releases/download/$($latestVersion)/act_runner-$($versionNoPrefix)-windows-amd64.exe" ; \
+    $downloadUrl = "https://gitea.com/gitea/act_runner/releases/download/$latestVersion/act_runner-$versionNoPrefix-windows-amd64.exe" ; \
     Invoke-WebRequest -Uri $downloadUrl -OutFile act_runner.exe
 
 # Copy the runner script
