@@ -16,8 +16,7 @@ on:
         type: boolean
 
 env:
-  DOCKER_REPOSITORY_BASE: ghcr.io/maui-containers/maui-linux
-  DOCKER_REPOSITORY_RUNNER: ghcr.io/maui-containers/maui-actions-runner
+  DOCKER_REPOSITORY: ghcr.io/maui-containers/maui-linux
   DOCKER_REPOSITORY_TEST: ghcr.io/maui-containers/maui-emulator-linux
 
 jobs:
@@ -45,9 +44,9 @@ jobs:
       shell: pwsh
       run: |
         if ("${{ inputs.force_build }}" -eq "true") {
-          ./check-workload-updates.ps1 -DockerRepository "${{ env.DOCKER_REPOSITORY_RUNNER }}" -TestDockerRepository "${{ env.DOCKER_REPOSITORY_TEST }}" -BaseDockerRepository "${{ env.DOCKER_REPOSITORY_BASE }}" -ForceBuild
+          ./check-workload-updates.ps1 -DockerRepository "${{ env.DOCKER_REPOSITORY }}" -TestDockerRepository "${{ env.DOCKER_REPOSITORY_TEST }}" -ForceBuild
         } else {
-          ./check-workload-updates.ps1 -DockerRepository "${{ env.DOCKER_REPOSITORY_RUNNER }}" -TestDockerRepository "${{ env.DOCKER_REPOSITORY_TEST }}" -BaseDockerRepository "${{ env.DOCKER_REPOSITORY_BASE }}"
+          ./check-workload-updates.ps1 -DockerRepository "${{ env.DOCKER_REPOSITORY }}" -TestDockerRepository "${{ env.DOCKER_REPOSITORY_TEST }}"
         }
 
   trigger-build-all:

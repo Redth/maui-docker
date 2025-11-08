@@ -13,13 +13,10 @@
     The .NET version to check for workload sets. Defaults to "9.0".
 
 .PARAMETER DockerRepository
-    The Docker repository to check for existing tags. Defaults to "ghcr.io/maui-containers/maui-actions-runner-linux".
+    The Docker repository to check for existing tags. Defaults to "ghcr.io/maui-containers/maui-linux".
 
 .PARAMETER TestDockerRepository
     The test Docker repository to check for existing tags. Defaults to "ghcr.io/maui-containers/maui-emulator-linux".
-
-.PARAMETER BaseDockerRepository
-    The base Docker repository to check for existing tags. Defaults to "ghcr.io/maui-containers/maui-linux".
 
 .PARAMETER TagPattern
     The tag pattern to look for. The script will replace placeholders with actual values:
@@ -59,21 +56,18 @@ param(
     [string]$DotnetVersion = "9.0",
 
     [Parameter(Position = 1)]
-    [string]$DockerRepository = "ghcr.io/maui-containers/maui-actions-runner-linux",
+    [string]$DockerRepository = "ghcr.io/maui-containers/maui-linux",
 
     [Parameter(Position = 2)]
     [string]$TestDockerRepository = "ghcr.io/maui-containers/maui-emulator-linux",
-
-    [Parameter(Position = 3)]
-    [string]$BaseDockerRepository = "ghcr.io/maui-containers/maui-linux",
     
-    [Parameter(Position = 4)]
+    [Parameter(Position = 3)]
     [string]$TagPattern = "{platform}-dotnet{dotnet_version}-workloads{workload_version}",
     
-    [Parameter(Position = 5)]
+    [Parameter(Position = 4)]
     [string]$TestTagPattern = "{platform}-dotnet{dotnet_version}-workloads{workload_version}-android{api_level}",
     
-    [Parameter(Position = 6)]
+    [Parameter(Position = 5)]
     [ValidateSet("github-actions", "object")]
     [string]$OutputFormat = "github-actions",
     
@@ -340,15 +334,15 @@ try {
         $hasTestBuilds = Test-TestRepositoryBuilds -Repository $TestDockerRepository -TagPattern $TestTagPattern -DotnetVersion $DotnetVersion -WorkloadVersion $dotnetCommandWorkloadSetVersion
         Write-HostWithPrefix "Has test builds: $hasTestBuilds"
         
-        # Check base repository for builds
-        $baseBuilds = Test-BaseRepositoryBuilds -Repository $BaseDockerRepository -TagPattern $TagPattern -DotnetVersion $DotnetVersion -WorkloadVersion $dotnetCommandWorkloadSetVersion
+        # Check Docker repository for builds (now includes integrated runner support)
+        $baseBuilds = Test-BaseRepositoryBuilds -Repository $DockerRepository -TagPattern $TagPattern -DotnetVersion $DotnetVersion -WorkloadVersion $dotnetCommandWorkloadSetVersion
         $hasLinuxBaseBuild = $baseBuilds.HasLinuxBase
         $hasWindowsBaseBuild = $baseBuilds.HasWindowsBase
         $hasAnyBaseBuild = $baseBuilds.HasAnyBase
-        Write-HostWithPrefix "Has base builds: $hasAnyBaseBuild (Linux: $hasLinuxBaseBuild, Windows: $hasWindowsBaseBuild)"
+        Write-HostWithPrefix "Has Docker image builds: $hasAnyBaseBuild (Linux: $hasLinuxBaseBuild, Windows: $hasWindowsBaseBuild)"
         
         $hasAnyBuild = $hasLinuxBuild -or $hasWindowsBuild -or $hasTestBuilds -or $hasAnyBaseBuild
-        Write-HostWithPrefix "Has any existing build (runner, test, or base): $hasAnyBuild"
+        Write-HostWithPrefix "Has any existing build (Docker images or test): $hasAnyBuild"
         
         # Check if we should force build regardless of existing tags
         if ($ForceBuild) {
@@ -409,7 +403,6 @@ try {
         ErrorMessage = $errorMessage
         DockerRepository = $DockerRepository
         TestDockerRepository = $TestDockerRepository
-        BaseDockerRepository = $BaseDockerRepository
         DotnetVersion = $DotnetVersion
     }
     
