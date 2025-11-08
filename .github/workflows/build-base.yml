@@ -1,4 +1,4 @@
-name: 🐋 Build Docker Base Images
+name: 🐋 Build Docker Images
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ on:
 
 jobs:
   build-linux:
-    name: 🐋 Build Linux Base (.NET ${{ matrix.DOTNET_VERSION }})
+    name: 🐋 Build Linux (.NET ${{ matrix.DOTNET_VERSION }})
     runs-on: ubuntu-latest
 
     strategy:
@@ -63,7 +63,7 @@ jobs:
         ./docker/build.ps1 @buildArgs
 
   build-windows:
-    name: 🐋 Build Windows Base (.NET ${{ matrix.DOTNET_VERSION }})
+    name: 🐋 Build Windows (.NET ${{ matrix.DOTNET_VERSION }})
     runs-on: windows-latest
 
     strategy:

@@ -202,10 +202,10 @@ jobs:
       with:
         driver: docker
 
-    - name: 🔨 Build base image
+    - name: 🔨 Build Docker image
       shell: pwsh
       run: |
-        Write-Host "Building base image for .NET ${{ matrix.dotnet_version }} on ${{ matrix.platform }}"
+        Write-Host "Building Docker image for .NET ${{ matrix.dotnet_version }} on ${{ matrix.platform }}"
         $dockerPlatform = "${{ matrix.platform }}/amd64"
         $buildArgs = @{
           DotnetVersion    = "${{ matrix.dotnet_version }}"
@@ -217,14 +217,14 @@ jobs:
         }
         ./docker/build.ps1 @buildArgs
 
-    - name: 🔍 Validate base image
+    - name: 🔍 Validate Docker image
       shell: pwsh
       run: |
         $imageName = "${{ env.DOCKER_REPOSITORY_BASE }}:${{ matrix.platform }}-dotnet${{ matrix.dotnet_version }}-pr-test"
         Write-Host "Validating image: $imageName"
         $imageExists = docker images --format "{{.Repository}}:{{.Tag}}" | Select-String -Pattern "$imageName"
         if ($imageExists) {
-          Write-Host "✅ Base image built successfully: $imageName"
+          Write-Host "✅ Docker image built successfully: $imageName"
           $imageInfo = docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedAt}}" --filter "reference=$imageName"
           Write-Host $imageInfo
         } else {
