@@ -157,7 +157,7 @@ jobs:
 
   build:
     needs: [get-workload-info, determine-matrix]
-    name: 🐋 Build Linux Test Image (.NET ${{ matrix.dotnet_version }}, API ${{ matrix.android_api_level }})
+    name: 🐋 Android ${{ matrix.android_api_level }} Emulator (.NET ${{ matrix.dotnet_version }})
     runs-on: ubuntu-latest
 
     strategy:
@@ -174,7 +174,7 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: 🔨 Build Docker Image
+    - name: 🔨 Build Android ${{ matrix.android_api_level }} Emulator
       shell: pwsh
       working-directory: ./docker/test/
       run: |
