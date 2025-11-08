@@ -2,10 +2,12 @@
 
 ## Repository Overview
 
-This repository provides Docker images for .NET MAUI development across three main categories:
-1. **Base Images** (`base/`) - MAUI development environment without GitHub Actions runner
-2. **Runner Images** (`runner/`) - Base images + GitHub Actions runner for CI/CD 
-3. **Test Images** (`test/`) - Ready-to-use testing environment with Appium and Android Emulator
+This repository provides development environments for .NET MAUI across multiple platforms:
+1. **Docker Images** (`docker/`) - Container images with integrated runner support
+   - `docker/linux/` - Linux MAUI development images
+   - `docker/windows/` - Windows MAUI development images  
+   - `docker/test/` - Testing environment with Appium and Android Emulator (Linux only)
+2. **Tart VM Images** (`tart/macos/`) - macOS virtual machine images with integrated runner support
 
 **Repository Size**: Small (~50 files)  
 **Languages**: PowerShell (primary), Dockerfile, YAML  
@@ -34,18 +36,18 @@ pwsh -Command ". ./common-functions.ps1; Get-LatestAppiumVersions"
 pwsh -Command ". ./common-functions.ps1; Find-LatestWorkloadSet -DotnetVersion '9.0'"
 ```
 
-**Build Base Images (Linux - Works in Docker environments):**
+**Build Docker Images (Linux - Works in Docker environments):**
 ```bash
-pwsh ./base/base-build.ps1 -DotnetVersion "9.0" -DockerPlatform "linux/amd64" -DockerRepository "test/maui-build" -Load:$true
+pwsh ./docker/build.ps1 -DotnetVersion "9.0" -DockerPlatform "linux/amd64" -DockerRepository "test/maui-build" -Load:$true
 ```
 
-**Build Test Images (Requires base image first):**
+**Build Test Images (Requires Docker base image first):**
 ```bash
-pwsh ./test/build.ps1 -AndroidSdkApiLevel 35 -DockerRepository "test/maui-testing" -Load:$true
+pwsh ./docker/test/build.ps1 -AndroidSdkApiLevel 35 -DockerRepository "test/maui-testing" -Load:$true
 ```
 
 ### Build Sequence - MUST Follow Order
-1. **Base images** must be built before runner/test images
+1. **Docker base images** must be built before test images
 2. **Windows builds** require Windows runners in CI
 3. **Test images** are Linux-only and require `/dev/kvm` device for emulator
 
@@ -61,7 +63,7 @@ pwsh ./test/build.ps1 -AndroidSdkApiLevel 35 -DockerRepository "test/maui-testin
 - Scripts include fallback versions when API calls fail
 
 **Docker Build Context Issues:**
-- All Docker builds use platform-specific subdirectories (`base/linux/`, `base/windows/`)
+- All Docker builds use platform-specific subdirectories (`docker/linux/`, `docker/windows/`)
 - Build scripts automatically change to correct directory
 
 **Workload Set Detection Failures:**
@@ -74,18 +76,24 @@ pwsh ./test/build.ps1 -AndroidSdkApiLevel 35 -DockerRepository "test/maui-testin
 ### Core Directories
 ```
 .github/workflows/     # CI/CD - builds triggered by schedule or dispatch
-base/                  # Base development images (foundation)
-├── base-build.ps1     # Cross-platform base image builder
-├── linux/             # Linux-specific Dockerfile and scripts
-└── windows/           # Windows-specific Dockerfile and scripts
-runner/                # GitHub Actions runner images (extends base)
-├── runner-build.ps1   # Cross-platform runner builder  
-├── linux/             # Linux runner implementation
-└── windows/           # Windows runner implementation
-test/                  # Testing images with Appium + Android emulator
-├── build.ps1          # Test image builder (Linux only)
-├── run.ps1            # Container runner helper
-└── Dockerfile         # Test image definition
+docker/                # Docker container images
+├── build.ps1          # Cross-platform Docker image builder
+├── linux/             # Linux MAUI images with integrated runner support
+│   ├── build.ps1      # Linux-specific build script
+│   ├── Dockerfile     # Linux image definition
+│   └── scripts/       # Init and runner scripts
+├── windows/           # Windows MAUI images with integrated runner support
+│   ├── build.ps1      # Windows-specific build script
+│   ├── Dockerfile     # Windows image definition
+│   └── scripts/       # Init and runner scripts
+└── test/              # Testing images with Appium + Android emulator
+    ├── build.ps1      # Test image builder (Linux only)
+    ├── run.ps1        # Container runner helper
+    └── Dockerfile     # Test image definition
+tart/                  # Tart VM images
+└── macos/             # macOS MAUI VMs with integrated runner support
+    └── scripts/       # Bootstrap, runner, and management scripts
+provisioning/          # PowerShell module for native macOS provisioning
 common-functions.ps1   # CRITICAL: Shared PowerShell functions
 check-workload-updates.ps1  # Automated version checking
 ```
@@ -100,9 +108,9 @@ check-workload-updates.ps1  # Automated version checking
 ```
 Microsoft .NET SDK Image
     ↓
-Base Image (MAUI Dev Environment)
+Docker Base Image (MAUI Dev + Integrated Runners)
     ↓
-Runner Image (Base + GitHub Actions)    Test Image (Base + Appium/Emulator)
+Test Image (Base + Appium/Emulator)
 ```
 
 **External Dependencies:**
@@ -115,16 +123,16 @@ Runner Image (Base + GitHub Actions)    Test Image (Base + Appium/Emulator)
 
 **Primary Workflows:**
 - `build-all.yml` - Comprehensive build of all image types
-- `build-base.yml` - Base images only  
-- `build-runner.yml` - Runner images only
+- `build-base.yml` - Docker base images only  
 - `build-test.yml` - Test images only
+- `build-tart-vms.yml` - macOS Tart VM images
 - `check-workload-updates.yml` - Automated version monitoring
 
 **Critical Workflow Features:**
 - Matrix builds across .NET versions and Android API levels
 - Automatic workload version detection
-- Multi-platform support (Linux/Windows)
-- Dependency ordering (base → runner/test)
+- Multi-platform support (Linux/Windows/macOS)
+- Dependency ordering (Docker base → test)
 
 ### Key Source Files
 
@@ -135,9 +143,9 @@ Runner Image (Base + GitHub Actions)    Test Image (Base + Appium/Emulator)
 - `Get-LatestAppiumVersions()` - npm package version detection
 
 **Build Entry Points:**
-- `base/base-build.ps1` - Main base image builder
-- `runner/runner-build.ps1` - Runner image builder
-- `test/build.ps1` - Test image builder
+- `docker/build.ps1` - Main Docker image builder
+- `docker/test/build.ps1` - Test image builder
+- `tart/macos/scripts/build.ps1` - Tart VM builder
 
 ## Validation Steps for Changes
 

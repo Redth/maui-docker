@@ -12,6 +12,7 @@ ARG ANDROID_SDK_API_LEVEL=35
 ARG ANDROID_SDK_BUILD_TOOLS_VERSION=33.0.3
 ARG ANDROID_SDK_CMDLINE_TOOLS_VERSION=13.0
 ARG DOTNET_WORKLOADS_VERSION=9.0.203
+ARG GITHUB_ACTIONS_RUNNER_VERSION=2.323.0
 
 ENV JDK_MAJOR_VERSION=${JDK_MAJOR_VERSION}
 ENV ANDROID_SDK_API_LEVEL=${ANDROID_SDK_API_LEVEL}
@@ -19,9 +20,30 @@ ENV ANDROID_SDK_BUILD_TOOLS_VERSION=${ANDROID_SDK_BUILD_TOOLS_VERSION}
 ENV ANDROID_SDK_CMDLINE_TOOLS_VERSION=${ANDROID_SDK_CMDLINE_TOOLS_VERSION}
 ENV DOTNET_VERSION=${DOTNET_VERSION}
 ENV DOTNET_WORKLOADS_VERSION=${DOTNET_WORKLOADS_VERSION}
+ENV GITHUB_ACTIONS_RUNNER_VERSION=${GITHUB_ACTIONS_RUNNER_VERSION}
 
 ENV INIT_PWSH_SCRIPT="/config/init.ps1"
 ENV INIT_BASH_SCRIPT="/config/init.sh"
+
+# GitHub Actions Runner environment variables
+ENV GITHUB_ORG=""
+ENV GITHUB_REPO=""
+ENV GITHUB_TOKEN=""
+ENV RUNNER_NAME_PREFIX="maui-runner"
+ENV RANDOM_RUNNER_SUFFIX=""
+ENV RUNNER_GROUP=""
+ENV RUNNER_WORKDIR=""
+ENV LABELS=""
+ENV DISABLE_AUTO_UPDATE=""
+ENV NO_DEFAULT_LABELS=""
+ENV EPHEMERAL=""
+
+# Gitea Actions Runner environment variables
+ENV GITEA_INSTANCE_URL=""
+ENV GITEA_RUNNER_TOKEN=""
+ENV GITEA_RUNNER_NAME=""
+ENV GITEA_RUNNER_NAME_PREFIX="gitea-runner"
+ENV GITEA_RUNNER_LABELS="maui,linux,amd64"
 
 # Set core environment variables
 ENV ANDROID_HOME=/home/mauiusr/.android \
@@ -96,8 +118,9 @@ ENV PATH="/home/mauiusr/.dotnet/tools:${PATH}"
 # Set working directory
 WORKDIR /home/mauiusr
 
-# Copy the init script
+# Copy the init script and runner script
 COPY scripts/init.sh /home/mauiusr/init.sh
+COPY scripts/runner.sh /home/mauiusr/runner.sh
 
 # Install and configure Android SDK
 RUN android sdk download --home="${ANDROID_HOME}"
@@ -129,6 +152,27 @@ RUN mkdir -p /usr/local/share || true
 RUN /tmp/generate-software-manifest.json.sh /usr/local/share/installed-software.json || echo "JSON manifest generation failed"
 RUN /tmp/generate-software-manifest-spdx.sh /usr/local/share/installed-software.json /usr/local/share/installed-software.spdx.json || echo "SPDX manifest generation failed"
 RUN /tmp/generate-software-manifest-cyclonedx.sh /usr/local/share/installed-software.json /usr/local/share/installed-software.cdx.json || echo "CycloneDX manifest generation failed"
+
+# Install GitHub Actions Runner
+RUN mkdir actions-runner
+WORKDIR /home/mauiusr/actions-runner
+RUN curl -o actions-runner-linux.tar.gz -L https://github.com/actions/runner/releases/download/v${GITHUB_ACTIONS_RUNNER_VERSION}/actions-runner-linux-x64-${GITHUB_ACTIONS_RUNNER_VERSION}.tar.gz
+RUN tar xzf ./actions-runner-linux.tar.gz
+RUN rm -rf ./actions-runner-linux.tar.gz
+
+# Install Gitea Actions Runner
+WORKDIR /home/mauiusr
+RUN mkdir gitea-runner
+WORKDIR /home/mauiusr/gitea-runner
+RUN LATEST_VERSION=$(curl -fsSL https://gitea.com/api/v1/repos/gitea/act_runner/releases | jq -r '.[0].tag_name') && \
+    VERSION_NO_PREFIX=${LATEST_VERSION#v} && \
+    DOWNLOAD_URL="https://gitea.com/gitea/act_runner/releases/download/${LATEST_VERSION}/act_runner-${VERSION_NO_PREFIX}-linux-amd64" && \
+    echo "Downloading act_runner version: ${LATEST_VERSION} from ${DOWNLOAD_URL}" && \
+    curl -fsSL "${DOWNLOAD_URL}" -o /home/mauiusr/gitea-runner/act_runner && \
+    chmod +x /home/mauiusr/gitea-runner/act_runner
+
+# Return to home directory
+WORKDIR /home/mauiusr
 
 # Default command - just keep the container running
 CMD ["tail", "-f", "/dev/null"]

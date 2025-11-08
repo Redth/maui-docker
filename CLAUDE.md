@@ -4,56 +4,40 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Overview
 
-This repository builds Docker images for .NET MAUI development, testing, and CI/CD. It provides four main types of Docker images:
+This repository provides development environments for .NET MAUI across multiple platforms:
 
-1. **Base Images** (`base/`) - MAUI development environment without CI runner
-2. **GitHub Runner Images** (`runner/`) - Base images + GitHub Actions runner for CI/CD
-3. **Gitea Runner Images** (`gitea-runner/`) - Base images + Gitea Actions runner for CI/CD
-4. **Test Images** (`test/`) - Ready-to-use testing environment with Appium and Android Emulator
+1. **Docker Images** (`docker/`) - Container images for Linux and Windows
+   - `docker/linux/` - Linux MAUI development images with integrated runner support
+   - `docker/windows/` - Windows MAUI development images with integrated runner support
+   - `docker/test/` - Testing environment with Appium and Android Emulator (Linux only)
+2. **Tart VM Images** (`tart/macos/`) - macOS virtual machine images with integrated runner support
+3. **Provisioning Module** (`provisioning/`) - PowerShell module for provisioning native macOS hosts
+
+All images support both GitHub Actions and Gitea Actions runners through conditional startup based on environment variables.
 
 ## Build Commands
 
-### Building Base Images
+### Building Docker Images
 ```powershell
-# Linux base image
-./base/linux/build.ps1 -DotnetVersion "9.0" -DockerRepository "your-repo/maui-build" -Version "latest"
-./base/linux/build.ps1 -DotnetVersion "10.0" -DockerRepository "your-repo/maui-build" -Version "latest"
+# Linux image with integrated runner support
+./docker/build.ps1 -DockerPlatform "linux/amd64" -DotnetVersion "9.0" -DockerRepository "your-repo/maui-build"
 
-# Windows base image
-./base/windows/build.ps1 -DotnetVersion "9.0" -DockerRepository "your-repo/maui-build" -Version "latest"
-./base/windows/build.ps1 -DotnetVersion "10.0" -DockerRepository "your-repo/maui-build" -Version "latest"
+# Windows image with integrated runner support
+./docker/build.ps1 -DockerPlatform "windows/amd64" -DotnetVersion "9.0" -DockerRepository "your-repo/maui-build"
 
-# Both platforms using unified script
-./base/base-build.ps1 -DockerPlatform "linux/amd64" -DockerRepository "your-repo/maui-build"
-./base/base-build.ps1 -DockerPlatform "windows/amd64" -DockerRepository "your-repo/maui-build"
-```
-
-### Building GitHub Runner Images
-```powershell
-# Build GitHub runner images (depend on base images)
-./runner/runner-build.ps1 -DotnetVersion "9.0" -DockerRepository "your-repo/maui-actions-runner" -DockerPlatform "linux/amd64"
-./runner/runner-build.ps1 -DotnetVersion "10.0" -DockerRepository "your-repo/maui-actions-runner" -DockerPlatform "linux/amd64"
-./runner/runner-build.ps1 -DotnetVersion "9.0" -DockerRepository "your-repo/maui-actions-runner" -DockerPlatform "windows/amd64"
-./runner/runner-build.ps1 -DotnetVersion "10.0" -DockerRepository "your-repo/maui-actions-runner" -DockerPlatform "windows/amd64"
-```
-
-### Building Gitea Runner Images
-```powershell
-# Build Gitea runner images (depend on base images)
-./gitea-runner/gitea-runner-build.ps1 -DotnetVersion "9.0" -DockerRepository "your-repo/maui-gitea-runner" -DockerPlatform "linux/amd64"
-./gitea-runner/gitea-runner-build.ps1 -DotnetVersion "10.0" -DockerRepository "your-repo/maui-gitea-runner" -DockerPlatform "linux/amd64"
-./gitea-runner/gitea-runner-build.ps1 -DotnetVersion "9.0" -DockerRepository "your-repo/maui-gitea-runner" -DockerPlatform "windows/amd64"
-./gitea-runner/gitea-runner-build.ps1 -DotnetVersion "10.0" -DockerRepository "your-repo/maui-gitea-runner" -DockerPlatform "windows/amd64"
+# Individual platform build scripts are also available
+./docker/linux/build.ps1 -DotnetVersion "9.0" -DockerRepository "your-repo/maui-build" -Version "latest"
+./docker/windows/build.ps1 -DotnetVersion "9.0" -DockerRepository "your-repo/maui-build" -Version "latest"
 ```
 
 ### Building Test Images
 ```powershell
 # Build test images with specific Android API level
-./test/build.ps1 -DotnetVersion "9.0" -AndroidSdkApiLevel 35 -DockerRepository "your-repo/maui-testing"
-./test/build.ps1 -DotnetVersion "10.0" -AndroidSdkApiLevel 35 -DockerRepository "your-repo/maui-testing"
+./docker/test/build.ps1 -DotnetVersion "9.0" -AndroidSdkApiLevel 35 -DockerRepository "your-repo/maui-testing"
+./docker/test/build.ps1 -DotnetVersion "10.0" -AndroidSdkApiLevel 35 -DockerRepository "your-repo/maui-testing"
 
 # Run a test container
-./test/run.ps1 -AndroidSdkApiLevel 35
+./docker/test/run.ps1 -AndroidSdkApiLevel 35
 ```
 
 ### Checking for Workload Updates
@@ -88,13 +72,12 @@ Key functions:
 
 ### Docker Image Hierarchy
 ```
-Base Image (MAUI Dev Environment)
-    ├─→ GitHub Runner Image (Base + GitHub Actions Runner)
-    │       ↓
-    │   Test Image (Runner + Appium + Android Emulator)
-    │
-    └─→ Gitea Runner Image (Base + Gitea Actions Runner)
+Docker Base Image (MAUI Dev + Integrated Runners)
+    ↓
+Test Image (Base + Appium + Android Emulator)
 ```
+
+All Docker images now include integrated GitHub Actions and Gitea Actions runner support. Runners start conditionally based on environment variables.
 
 ### Platform Support
 - **Linux**: `linux/amd64` - Full support for all image types
@@ -115,9 +98,9 @@ The build system:
 ### GitHub Actions Integration
 Comprehensive CI/CD workflows in `.github/workflows/`:
 - `build-all.yml` - Builds all image types with matrix strategy
-- `build-base.yml` - Builds base images only
-- `build-runner.yml` - Builds runner images only
+- `build-base.yml` - Builds Docker base images
 - `build-test.yml` - Builds test images for multiple API levels
+- `build-tart-vms.yml` - Builds macOS Tart VM images
 - `check-workload-updates.yml` - Monitors for workload updates
 
 ## Common Parameters
@@ -149,7 +132,9 @@ The repository includes a dedicated PR validation workflow (`pr-validation.yml`)
 
 ## Key Environment Variables
 
-For GitHub runner images:
+All images support integrated runner functionality. Provide credentials for GitHub Actions, Gitea Actions, or both:
+
+### GitHub Actions Runner Variables:
 - `GITHUB_TOKEN` - Required for runner registration
 - `GITHUB_ORG` - GitHub organization
 - `GITHUB_REPO` - Repository name (optional, defaults to org-level)
@@ -162,18 +147,20 @@ For GitHub runner images:
 - `EPHEMERAL` - Enable ephemeral mode (runner deleted after one job)
 - `DISABLE_AUTO_UPDATE` - Disable automatic runner updates
 - `NO_DEFAULT_LABELS` - Remove default labels
-- `INIT_PWSH_SCRIPT` - Custom PowerShell initialization script
-- `INIT_BASH_SCRIPT` - Custom bash initialization script (Linux only)
 
-For Gitea runner images:
+### Gitea Actions Runner Variables:
 - `GITEA_INSTANCE_URL` - Required - Gitea instance URL (e.g., "https://gitea.example.com")
 - `GITEA_RUNNER_TOKEN` - Required - Runner registration token from Gitea
 - `GITEA_RUNNER_NAME` - Custom runner name (auto-generated if not set)
 - `GITEA_RUNNER_NAME_PREFIX` - Prefix for auto-generated runner names (default: "gitea-runner")
 - `RANDOM_RUNNER_SUFFIX` - Add random suffix to runner name (default: "true")
 - `GITEA_RUNNER_LABELS` - Comma-separated labels (default: "maui,linux,amd64" or "maui,windows,amd64")
+
+### Common Initialization Variables:
 - `INIT_PWSH_SCRIPT` - Custom PowerShell initialization script
 - `INIT_BASH_SCRIPT` - Custom bash initialization script (Linux only)
+
+**Note**: If no runner credentials are provided, the image starts as a development environment without runners.
 
 For test images:
 - Android emulator and Appium are pre-configured and auto-started
@@ -182,7 +169,7 @@ For test images:
 
 ## Testing
 
-The test images are designed for UI testing with Appium and include:
+The test images (`docker/test/`) are designed for UI testing with Appium and include:
 - Pre-installed Android Emulator for specified API level
 - Appium Server with UIAutomator2 driver
 - Automatic service startup on container launch
@@ -272,8 +259,8 @@ android sdk list --installed
 xcodebuild -version
 
 # Build and run tests
-pwsh ./test/build.ps1 -AndroidSdkApiLevel 35 -Load
-pwsh ./test/run.ps1 -AndroidSdkApiLevel 35
+pwsh ./docker/test/build.ps1 -AndroidSdkApiLevel 35 -Load
+pwsh ./docker/test/run.ps1 -AndroidSdkApiLevel 35
 ```
 
 ### .NET Version Support

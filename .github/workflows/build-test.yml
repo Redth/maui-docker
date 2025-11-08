@@ -172,7 +172,7 @@ jobs:
 
     - name: 🔨 Build Docker Image
       shell: pwsh
-      working-directory: ./test/
+      working-directory: ./docker/test/
       run: |
         # Build arguments
         $buildArgs = @{

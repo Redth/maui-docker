@@ -58,7 +58,7 @@ export ANDROID_SDK_ROOT="$HOME/Library/Android/sdk"
 ## Validation
 After provisioning, run a quick smoke test:
 ```powershell
-pwsh ./test/build.ps1 -AndroidSdkApiLevel 35 -Load
-pwsh ./test/run.ps1 -AndroidSdkApiLevel 35
+pwsh ./docker/test/build.ps1 -AndroidSdkApiLevel 35 -Load
+pwsh ./docker/test/run.ps1 -AndroidSdkApiLevel 35
 ```
 Confirm `dotnet --info`, `android sdk list --installed`, and `xcodebuild -version` all succeed.

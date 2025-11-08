@@ -34,7 +34,7 @@ on:
     types: [trigger-build-all]
 
 jobs:
-  # Step 1: Build Base Images (Linux and Windows)
+  # Build Base Images (Linux and Windows) - now includes runner functionality
   build-base-linux:
     name: 🐋 Build Linux Base (.NET ${{ matrix.DOTNET_VERSION }})
     runs-on: ubuntu-latest
@@ -80,7 +80,7 @@ jobs:
           $buildArgs.WorkloadSetVersion = "${{ steps.vars.outputs.workload_set_version }}"
         }
 
-        ./base/base-build.ps1 @buildArgs
+        ./docker/build.ps1 @buildArgs
 
   build-base-windows:
     name: 🐋 Build Windows Base (.NET ${{ matrix.DOTNET_VERSION }})
@@ -128,205 +128,9 @@ jobs:
           $buildArgs.WorkloadSetVersion = "${{ steps.vars.outputs.workload_set_version }}"
         }
 
-        ./base/base-build.ps1 @buildArgs
+        ./docker/build.ps1 @buildArgs
 
-  # Step 2: Build Runner Images (depends on base images)
-  build-runner-windows:
-    name: 🐋 Build Windows Runner (.NET ${{ matrix.DOTNET_VERSION }})
-    runs-on: windows-latest
-    needs: build-base-windows
-    strategy:
-      matrix:
-        DOTNET_VERSION: [ "9.0", "10.0" ]
-    
-    steps:
-    - name: 🛒 Checkout
-      uses: actions/checkout@v4
-
-    - name: 🔧 Set Variables
-      id: vars
-      shell: bash
-      run: |
-        # Determine workload set version from either workflow_dispatch input or repository_dispatch payload
-        if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
-          WORKLOAD_SET_VERSION="${{ github.event.client_payload.workload_set_version }}"
-        else
-          WORKLOAD_SET_VERSION="${{ inputs.workload_set_version }}"
-        fi
-        echo "workload_set_version=$WORKLOAD_SET_VERSION" >> $GITHUB_OUTPUT
-        echo "Using workload set version: $WORKLOAD_SET_VERSION"
-
-    - name: 🐋 Login to GitHub Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: 🔧 Build Runner Image
-      shell: pwsh
-      run: |
-        $buildArgs = @{
-          DotNetVersion     = "${{ matrix.DOTNET_VERSION }}"
-          DockerPlatform    = "windows/amd64"
-          Version           = "latest"
-          Push              = $true
-        }
-
-        # Add workload set version if specified
-        if ("${{ steps.vars.outputs.workload_set_version }}" -ne "") {
-          $buildArgs.WorkloadSetVersion = "${{ steps.vars.outputs.workload_set_version }}"
-        }
-
-        ./runner/runner-build.ps1 @buildArgs
-
-  build-runner-linux:
-    name: 🐋 Build Linux Runner (.NET ${{ matrix.DOTNET_VERSION }})
-    runs-on: ubuntu-latest
-    needs: build-base-linux
-    strategy:
-      matrix:
-        DOTNET_VERSION: [ "9.0", "10.0" ]
-    
-    steps:
-    - name: 🛒 Checkout
-      uses: actions/checkout@v4
-
-    - name: 🔧 Set Variables
-      id: vars
-      run: |
-        # Determine workload set version from either workflow_dispatch input or repository_dispatch payload
-        if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
-          WORKLOAD_SET_VERSION="${{ github.event.client_payload.workload_set_version }}"
-        else
-          WORKLOAD_SET_VERSION="${{ inputs.workload_set_version }}"
-        fi
-        echo "workload_set_version=$WORKLOAD_SET_VERSION" >> $GITHUB_OUTPUT
-        echo "Using workload set version: $WORKLOAD_SET_VERSION"
-
-    - name: 🐋 Login to GitHub Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: 🔧 Build Runner Image
-      shell: pwsh
-      run: |
-        $buildArgs = @{
-          DotNetVersion     = "${{ matrix.DOTNET_VERSION }}"
-          DockerPlatform    = "linux/amd64"
-          Version           = "latest"
-          Push              = $true
-        }
-
-        # Add workload set version if specified
-        if ("${{ steps.vars.outputs.workload_set_version }}" -ne "") {
-          $buildArgs.WorkloadSetVersion = "${{ steps.vars.outputs.workload_set_version }}"
-        }
-
-        ./runner/runner-build.ps1 @buildArgs
-
-  # Step 3: Build Gitea Runner Images (depends on base images)
-  build-gitea-runner-windows:
-    name: 🐋 Build Windows Gitea Runner (.NET ${{ matrix.DOTNET_VERSION }})
-    runs-on: windows-latest
-    needs: build-base-windows
-    strategy:
-      matrix:
-        DOTNET_VERSION: [ "9.0", "10.0" ]
-
-    steps:
-    - name: 🛒 Checkout
-      uses: actions/checkout@v4
-
-    - name: 🔧 Set Variables
-      id: vars
-      shell: bash
-      run: |
-        # Determine workload set version from either workflow_dispatch input or repository_dispatch payload
-        if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
-          WORKLOAD_SET_VERSION="${{ github.event.client_payload.workload_set_version }}"
-        else
-          WORKLOAD_SET_VERSION="${{ inputs.workload_set_version }}"
-        fi
-        echo "workload_set_version=$WORKLOAD_SET_VERSION" >> $GITHUB_OUTPUT
-        echo "Using workload set version: $WORKLOAD_SET_VERSION"
-
-    - name: 🐋 Login to GitHub Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: 🔧 Build Gitea Runner Image
-      shell: pwsh
-      run: |
-        $buildArgs = @{
-          DotNetVersion     = "${{ matrix.DOTNET_VERSION }}"
-          DockerPlatform    = "windows/amd64"
-          Version           = "latest"
-          Push              = $true
-        }
-
-        # Add workload set version if specified
-        if ("${{ steps.vars.outputs.workload_set_version }}" -ne "") {
-          $buildArgs.WorkloadSetVersion = "${{ steps.vars.outputs.workload_set_version }}"
-        }
-
-        ./gitea-runner/gitea-runner-build.ps1 @buildArgs
-
-  build-gitea-runner-linux:
-    name: 🐋 Build Linux Gitea Runner (.NET ${{ matrix.DOTNET_VERSION }})
-    runs-on: ubuntu-latest
-    needs: build-base-linux
-    strategy:
-      matrix:
-        DOTNET_VERSION: [ "9.0", "10.0" ]
-
-    steps:
-    - name: 🛒 Checkout
-      uses: actions/checkout@v4
-
-    - name: 🔧 Set Variables
-      id: vars
-      run: |
-        # Determine workload set version from either workflow_dispatch input or repository_dispatch payload
-        if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
-          WORKLOAD_SET_VERSION="${{ github.event.client_payload.workload_set_version }}"
-        else
-          WORKLOAD_SET_VERSION="${{ inputs.workload_set_version }}"
-        fi
-        echo "workload_set_version=$WORKLOAD_SET_VERSION" >> $GITHUB_OUTPUT
-        echo "Using workload set version: $WORKLOAD_SET_VERSION"
-
-    - name: 🐋 Login to GitHub Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: 🔧 Build Gitea Runner Image
-      shell: pwsh
-      run: |
-        $buildArgs = @{
-          DotNetVersion     = "${{ matrix.DOTNET_VERSION }}"
-          DockerPlatform    = "linux/amd64"
-          Version           = "latest"
-          Push              = $true
-        }
-
-        # Add workload set version if specified
-        if ("${{ steps.vars.outputs.workload_set_version }}" -ne "") {
-          $buildArgs.WorkloadSetVersion = "${{ steps.vars.outputs.workload_set_version }}"
-        }
-
-        ./gitea-runner/gitea-runner-build.ps1 @buildArgs
-
-  # Step 4: Get workload info for test builds
+  # Get workload info for test builds
   get-workload-info:
     name: 🔍 Get Workload Information
     runs-on: ubuntu-latest
@@ -484,13 +288,13 @@ jobs:
           $buildArgs.AppiumUIAutomator2DriverVersion = "${{ inputs.appium_uiautomator2_driver_version }}"
         }
 
-        ./test/build.ps1 @buildArgs
+        ./docker/test/build.ps1 @buildArgs
 
-  # Step 6: Summary
+  # Summary
   build-summary:
     name: 📋 Build Summary
     runs-on: ubuntu-latest
-    needs: [build-base-linux, build-base-windows, build-runner-linux, build-runner-windows, build-gitea-runner-linux, build-gitea-runner-windows, build-test-linux]
+    needs: [build-base-linux, build-base-windows, build-test-linux]
     if: always()
     
     steps:
@@ -498,42 +302,22 @@ jobs:
       run: |
         echo "## Build Results Summary" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### Base Images" >> $GITHUB_STEP_SUMMARY
+        echo "### Base Images (includes GitHub/Gitea runner support)" >> $GITHUB_STEP_SUMMARY
         echo "- **Linux Base:** ${{ needs.build-base-linux.result }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Windows Base:** ${{ needs.build-base-windows.result }}" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### GitHub Runner Images" >> $GITHUB_STEP_SUMMARY
-        echo "- **Linux Runner:** ${{ needs.build-runner-linux.result }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Windows Runner:** ${{ needs.build-runner-windows.result }}" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### Gitea Runner Images" >> $GITHUB_STEP_SUMMARY
-        echo "- **Linux Gitea Runner:** ${{ needs.build-gitea-runner-linux.result }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Windows Gitea Runner:** ${{ needs.build-gitea-runner-windows.result }}" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### Test Images" >> $GITHUB_STEP_SUMMARY
         echo "- **Linux Test:** ${{ needs.build-test-linux.result }}" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
 
         # Count successful builds
-        total_builds=7
+        total_builds=3
         successful_builds=0
 
         if [ "${{ needs.build-base-linux.result }}" == "success" ]; then
           successful_builds=$((successful_builds + 1))
         fi
         if [ "${{ needs.build-base-windows.result }}" == "success" ]; then
-          successful_builds=$((successful_builds + 1))
-        fi
-        if [ "${{ needs.build-runner-linux.result }}" == "success" ]; then
-          successful_builds=$((successful_builds + 1))
-        fi
-        if [ "${{ needs.build-runner-windows.result }}" == "success" ]; then
-          successful_builds=$((successful_builds + 1))
-        fi
-        if [ "${{ needs.build-gitea-runner-linux.result }}" == "success" ]; then
-          successful_builds=$((successful_builds + 1))
-        fi
-        if [ "${{ needs.build-gitea-runner-windows.result }}" == "success" ]; then
           successful_builds=$((successful_builds + 1))
         fi
         if [ "${{ needs.build-test-linux.result }}" == "success" ]; then
@@ -547,3 +331,7 @@ jobs:
         else
           echo "⚠️ Some builds failed. Please check the individual job logs." >> $GITHUB_STEP_SUMMARY
         fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Note:** Base images now include GitHub Actions and Gitea Actions runner support." >> $GITHUB_STEP_SUMMARY
+        echo "Enable runners by setting environment variables at runtime." >> $GITHUB_STEP_SUMMARY

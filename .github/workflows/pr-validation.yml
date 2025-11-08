@@ -4,9 +4,8 @@ on:
   pull_request:
     branches: [ main ]
     paths:
-      - 'base/**'
-      - 'runner/**'
-      - 'test/**'
+      - 'docker/**'
+      - 'tart/**'
       - 'common-functions.ps1'
       - '.github/workflows/**'
   workflow_dispatch:
@@ -29,7 +28,6 @@ on:
 env:
   # Use test repository names to avoid conflicts
   DOCKER_REPOSITORY_BASE: pr-test/maui-build
-  DOCKER_REPOSITORY_RUNNER: pr-test/maui-actions-runner
   DOCKER_REPOSITORY_TEST: pr-test/maui-testing
 
 jobs:
@@ -173,8 +171,8 @@ jobs:
         }
         else {
           foreach ($dotnetVersion in $dotnetVersions) {
-            $matrix += New-MatrixEntry -DotnetVersion $dotnetVersion -Platform "linux" -RunnerOs "ubuntu-latest" -BuildRunner 'true' -BuildTest 'true' -AndroidApiLevel '35'
-            $matrix += New-MatrixEntry -DotnetVersion $dotnetVersion -Platform "windows" -RunnerOs "windows-latest" -BuildRunner 'true'
+            $matrix += New-MatrixEntry -DotnetVersion $dotnetVersion -Platform "linux" -RunnerOs "ubuntu-latest" -BuildTest 'true' -AndroidApiLevel '35'
+            $matrix += New-MatrixEntry -DotnetVersion $dotnetVersion -Platform "windows" -RunnerOs "windows-latest"
           }
         }
         
@@ -217,7 +215,7 @@ jobs:
           Push             = $false
           Load             = $true
         }
-        ./base/base-build.ps1 @buildArgs
+        ./docker/build.ps1 @buildArgs
 
     - name: 🔍 Validate base image
       shell: pwsh
@@ -311,66 +309,50 @@ jobs:
           }
         }
 
-    - name: 🔨 Build runner image
-      if: matrix.build_runner == 'true'
-      shell: pwsh
-      run: |
-        Write-Host "Building runner image for .NET ${{ matrix.dotnet_version }} on ${{ matrix.platform }}"
-        $dockerPlatform = "${{ matrix.platform }}/amd64"
-        $buildArgs = @{
-          DotnetVersion        = "${{ matrix.dotnet_version }}"
-          DockerRepository     = "${{ env.DOCKER_REPOSITORY_RUNNER }}"
-          BaseDockerRepository = "${{ env.DOCKER_REPOSITORY_BASE }}"
-          DockerPlatform       = $dockerPlatform
-          Version              = "pr-test"
-          Push                 = $false
-          Load                 = $true
-        }
-        if ("${{ matrix.platform }}" -eq "linux") {
-          $buildArgs.UseBuildx = $false
-        }
-        ./runner/runner-build.ps1 @buildArgs
-
-    - name: 🔍 Validate runner image
-      if: matrix.build_runner == 'true'
-      shell: pwsh
-      run: |
-        $imageName = "${{ env.DOCKER_REPOSITORY_RUNNER }}:${{ matrix.platform }}-dotnet${{ matrix.dotnet_version }}-pr-test"
-        Write-Host "Validating image: $imageName"
-        $imageExists = docker images --format "{{.Repository}}:{{.Tag}}" | Select-String -Pattern "$imageName"
-        if ($imageExists) {
-          Write-Host "✅ Runner image built successfully: $imageName"
-        } else {
-          Write-Error "❌ Runner image not found: $imageName"
-          docker images
-          exit 1
-        }
-
-    - name: 🧪 Runner image test
-      if: matrix.build_runner == 'true'
+    - name: 🧪 Test runner functionality
       shell: pwsh
       run: |
         # Construct image name
-        $imageName = "${{ env.DOCKER_REPOSITORY_RUNNER }}:${{ matrix.platform }}-dotnet${{ matrix.dotnet_version }}-pr-test"
+        $imageName = "${{ env.DOCKER_REPOSITORY_BASE }}:${{ matrix.platform }}-dotnet${{ matrix.dotnet_version }}-pr-test"
         
-        Write-Host "Testing runner functionality of: $imageName"
+        Write-Host "Testing that base image includes runner functionality: $imageName"
         
         if ("${{ matrix.platform }}" -eq "linux") {
-          # Test that GitHub Actions runner files are present
-          $runnerScript = docker run --rm $imageName bash -c 'ls /actions-runner/run.sh 2>/dev/null && echo "found" || echo "not found"'
-          if ($runnerScript -eq "found") {
-            Write-Host "✅ GitHub Actions runner script found"
+          # Test that GitHub Actions runner files are present in base image
+          $githubRunnerScript = docker run --rm $imageName bash -c 'ls /home/mauiusr/actions-runner/run.sh 2>/dev/null && echo "found" || echo "not found"'
+          if ($githubRunnerScript -eq "found") {
+            Write-Host "✅ GitHub Actions runner found in base image"
           } else {
-            Write-Warning "⚠️ GitHub Actions runner script not found"
+            Write-Error "❌ GitHub Actions runner script not found in base image"
+            exit 1
+          }
+          
+          # Test that Gitea runner files are present in base image
+          $giteaRunnerBinary = docker run --rm $imageName bash -c 'ls /home/mauiusr/gitea-runner/act_runner 2>/dev/null && echo "found" || echo "not found"'
+          if ($giteaRunnerBinary -eq "found") {
+            Write-Host "✅ Gitea Actions runner found in base image"
+          } else {
+            Write-Error "❌ Gitea Actions runner binary not found in base image"
+            exit 1
           }
         }
         elseif ("${{ matrix.platform }}" -eq "windows") {
-          # Test that GitHub Actions runner files are present (Windows)
-          $runnerScript = docker run --rm $imageName powershell -c 'if (Test-Path "C:\actions-runner\run.cmd") { "found" } else { "not found" }'
-          if ($runnerScript -eq "found") {
-            Write-Host "✅ GitHub Actions runner script found"
+          # Test that GitHub Actions runner files are present in base image (Windows)
+          $githubRunnerScript = docker run --rm $imageName powershell -c 'if (Test-Path "C:\actions-runner\run.cmd") { "found" } else { "not found" }'
+          if ($githubRunnerScript -eq "found") {
+            Write-Host "✅ GitHub Actions runner found in base image"
           } else {
-            Write-Warning "⚠️ GitHub Actions runner script not found"
+            Write-Error "❌ GitHub Actions runner script not found in base image"
+            exit 1
+          }
+          
+          # Test that Gitea runner files are present in base image (Windows)
+          $giteaRunnerBinary = docker run --rm $imageName powershell -c 'if (Test-Path "C:\gitea-runner\act_runner.exe") { "found" } else { "not found" }'
+          if ($giteaRunnerBinary -eq "found") {
+            Write-Host "✅ Gitea Actions runner found in base image"
+          } else {
+            Write-Error "❌ Gitea Actions runner binary not found in base image"
+            exit 1
           }
         }
 
@@ -393,7 +375,7 @@ jobs:
         if ("${{ matrix.platform }}" -eq "linux") {
           $buildArgs.UseBuildx = $false
         }
-        ./test/build.ps1 @buildArgs
+        ./docker/test/build.ps1 @buildArgs
 
     - name: 🔍 Validate test image
       if: matrix.build_test == 'true'

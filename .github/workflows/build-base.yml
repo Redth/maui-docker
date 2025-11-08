@@ -60,7 +60,7 @@ jobs:
           $buildArgs.WorkloadSetVersion = "${{ steps.vars.outputs.workload_set_version }}"
         }
 
-        ./base/base-build.ps1 @buildArgs
+        ./docker/build.ps1 @buildArgs
 
   build-windows:
     name: 🐋 Build Windows Base (.NET ${{ matrix.DOTNET_VERSION }})
@@ -113,4 +113,4 @@ jobs:
           $buildArgs.WorkloadSetVersion = "${{ steps.vars.outputs.workload_set_version }}"
         }
 
-        ./base/base-build.ps1 @buildArgs
+        ./docker/build.ps1 @buildArgs

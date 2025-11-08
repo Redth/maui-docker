@@ -1,16 +1,21 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `base/` hosts MAUI development images; use `linux/` and `windows/` subfolders plus shared helpers in `base/base-build.ps1`.
-- `runner/` layers GitHub Actions runners on top of the base images with platform-specific contexts.
-- `test/` builds the Appium-enabled Android emulator image; `run.ps1` performs local smoke runs.
+- `docker/` hosts Docker container images organized by platform
+  - `docker/linux/` - Linux MAUI development images with integrated runner support
+  - `docker/windows/` - Windows MAUI development images with integrated runner support
+  - `docker/test/` - Appium-enabled Android emulator images (Linux only)
+  - `docker/build.ps1` - Unified cross-platform build script
+- `tart/` hosts macOS VM images
+  - `tart/macos/` - macOS MAUI development VMs with integrated runner support
+- `provisioning/` contains shared provisioning scripts for all platforms
 - Shared PowerShell utilities sit in `common-functions.ps1`; transient build artifacts land in `_temp/`.
 
 ## Build, Test, and Development Commands
-- `pwsh base/base-build.ps1 -DockerPlatform linux/amd64 -Version <tag>` builds and tags the Linux base image.
-- `pwsh runner/runner-build.ps1 -DockerPlatform windows/amd64 -Version <tag> [-Push]` produces the runner image and optionally pushes it.
-- `pwsh test/build.ps1 -AndroidSdkApiLevel 35 [-Load]` prepares the Android emulator image; add `-Load` to keep it locally.
-- `pwsh test/run.ps1 -AndroidSdkApiLevel 35` starts the emulator container with Appium and ADB ports exposed.
+- `pwsh docker/build.ps1 -DockerPlatform linux/amd64 -Version <tag>` builds and tags the Linux base image.
+- `pwsh docker/build.ps1 -DockerPlatform windows/amd64 -Version <tag> [-Push]` builds and tags the Windows base image.
+- `pwsh docker/test/build.ps1 -AndroidSdkApiLevel 35 [-Load]` prepares the Android emulator image; add `-Load` to keep it locally.
+- `pwsh docker/test/run.ps1 -AndroidSdkApiLevel 35` starts the emulator container with Appium and ADB ports exposed.
 
 ## Coding Style & Naming Conventions
 - PowerShell scripts begin with `Param` blocks, use PascalCase parameter names, and four-space indentation.
@@ -18,7 +23,7 @@
 - Dockerfiles keep uppercase instructions, group related `RUN` steps, and expose overrides through paired `ARG` and `ENV` values.
 
 ## Testing Guidelines
-- Rebuild the affected image before merging; follow with `test/run.ps1` to verify emulator, ADB, and Appium endpoints.
+- Rebuild the affected image before merging; follow with `docker/test/run.ps1` to verify emulator, ADB, and Appium endpoints.
 - When editing shared helpers, execute at least one Linux and one Windows build path to confirm tool discovery.
 - Keep test utilities in verb-form (`build.ps1`, `run.ps1`) and mirror existing naming when adding scripts.
 

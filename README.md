@@ -1,18 +1,38 @@
-# maui-docker
+# maui-containers
 Docker images and macOS VMs for MAUI development/building/testing. See the [Repository Guidelines](AGENTS.md) for contributor instructions.
 
-This repository provides comprehensive tooling for .NET MAUI development:
+This repository provides comprehensive tooling for .NET MAUI development, organized by container platform type:
+
+## Repository Structure
+
+```
+maui-containers/
+├── docker/               # Docker container images
+│   ├── linux/           # Linux MAUI development images
+│   ├── windows/         # Windows MAUI development images
+│   ├── test/            # Android emulator + Appium test images (Linux)
+│   └── build.ps1        # Cross-platform Docker build script
+├── tart/                # macOS VM images
+│   └── macos/           # macOS MAUI development VMs (Tart)
+└── provisioning/        # Provisioning scripts for all platforms
+```
 
 ## Docker Images (Linux/Windows)
-1. **Base Images** - MAUI development environment without CI runner
-2. **GitHub Runner Images** - Base images + GitHub Actions runner for CI/CD
-3. **Gitea Runner Images** - Base images + Gitea Actions runner for CI/CD
-4. **Test Images** - Ready-to-use testing environment with Appium and Android Emulator
+Located in `docker/` directory:
+
+1. **Platform Images** (`docker/linux/`, `docker/windows/`) - MAUI development environment with optional GitHub/Gitea runner support
+   - Can be used as development containers (no runners)
+   - Can enable GitHub Actions runner via environment variables
+   - Can enable Gitea Actions runner via environment variables
+   - Can run both runners simultaneously
+2. **Test Images** (`docker/test/`) - Ready-to-use testing environment with Appium and Android Emulator (Linux only)
 
 ## macOS Virtual Machines (Tart)
-5. **Tart VM Images** - Complete macOS MAUI development VMs with iOS/macOS/Android support
+Located in `tart/` directory:
+
+3. **macOS VM Images** (`tart/macos/`) - Complete macOS MAUI development VMs with iOS/macOS/Android support
    - Published to GitHub Container Registry (ghcr.io)
-   - Includes both GitHub and Gitea Actions runners
+   - Includes both GitHub and Gitea Actions runners (optional, enabled via environment variables)
    - Supports multiple Xcode versions
 
 ## Image Naming & Tag Format

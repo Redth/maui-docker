@@ -6,10 +6,10 @@ This guide provides commands for building Docker images and Tart VM images local
 
 - [Prerequisites](#prerequisites)
 - [Docker Images](#docker-images)
-  - [Linux Base Images](#linux-base-images)
-  - [Windows Base Images](#windows-base-images)
-  - [Runner Images](#runner-images)
+  - [Linux Images (with Integrated Runner Support)](#linux-images-with-integrated-runner-support)
+  - [Windows Images (with Integrated Runner Support)](#windows-images-with-integrated-runner-support)
   - [Test Images](#test-images)
+  - [Using Runners in Docker Images](#using-runners-in-docker-images)
 - [Tart VM Images](#tart-vm-images)
   - [Building VMs](#building-vms)
   - [Running VMs](#running-vms)
@@ -44,22 +44,22 @@ This guide provides commands for building Docker images and Tart VM images local
 
 ## Docker Images
 
-### Linux Base Images
+### Linux Images (with Integrated Runner Support)
 
 #### .NET 9.0
 ```bash
 # Build with default settings
-pwsh ./base/linux/build.ps1 -DotnetVersion "9.0" -DockerRepository "maui-build" -Load
+pwsh ./docker/linux/build.ps1 -DotnetVersion "9.0" -DockerRepository "maui-build" -Load
 
 # Build with specific workload version
-pwsh ./base/linux/build.ps1 \
+pwsh ./docker/linux/build.ps1 \
   -DotnetVersion "9.0" \
   -WorkloadSetVersion "9.0.203" \
   -DockerRepository "maui-build" \
   -Load
 
 # Build with specific Android API level
-pwsh ./base/linux/build.ps1 \
+pwsh ./docker/linux/build.ps1 \
   -DotnetVersion "9.0" \
   -AndroidSdkApiLevel 35 \
   -DockerRepository "maui-build" \
@@ -69,71 +69,31 @@ pwsh ./base/linux/build.ps1 \
 #### .NET 10.0 (Preview)
 ```bash
 # Build with auto-detected preview workloads
-pwsh ./base/linux/build.ps1 -DotnetVersion "10.0" -DockerRepository "maui-build" -Load
+pwsh ./docker/linux/build.ps1 -DotnetVersion "10.0" -DockerRepository "maui-build" -Load
 ```
 
 #### Unified Build Script
 ```bash
 # Build for current platform
-pwsh ./base/base-build.ps1 \
+pwsh ./docker/build.ps1 \
   -DockerPlatform "linux/amd64" \
   -DockerRepository "maui-build" \
   -Load
 ```
 
-### Windows Base Images
+### Windows Images (with Integrated Runner Support)
 
 **Note:** Requires Windows with Docker Desktop set to Windows containers mode.
 
 #### .NET 9.0
 ```powershell
 # Build Windows image
-pwsh ./base/windows/build.ps1 -DotnetVersion "9.0" -DockerRepository "maui-build" -Load
+pwsh ./docker/windows/build.ps1 -DotnetVersion "9.0" -DockerRepository "maui-build" -Load
 ```
 
 #### .NET 10.0 (Preview)
 ```powershell
-pwsh ./base/windows/build.ps1 -DotnetVersion "10.0" -DockerRepository "maui-build" -Load
-```
-
-### Runner Images
-
-#### GitHub Actions Runner - Linux
-```bash
-# Build GitHub runner (depends on base image)
-pwsh ./runner/runner-build.ps1 \
-  -DotnetVersion "9.0" \
-  -DockerPlatform "linux/amd64" \
-  -DockerRepository "maui-actions-runner" \
-  -Load
-```
-
-#### GitHub Actions Runner - Windows
-```powershell
-pwsh ./runner/runner-build.ps1 \
-  -DotnetVersion "9.0" \
-  -DockerPlatform "windows/amd64" \
-  -DockerRepository "maui-actions-runner" \
-  -Load
-```
-
-#### Gitea Actions Runner - Linux
-```bash
-# Build Gitea runner (depends on base image)
-pwsh ./gitea-runner/gitea-runner-build.ps1 \
-  -DotnetVersion "9.0" \
-  -DockerPlatform "linux/amd64" \
-  -DockerRepository "maui-gitea-runner" \
-  -Load
-```
-
-#### Gitea Actions Runner - Windows
-```powershell
-pwsh ./gitea-runner/gitea-runner-build.ps1 \
-  -DotnetVersion "9.0" \
-  -DockerPlatform "windows/amd64" \
-  -DockerRepository "maui-gitea-runner" \
-  -Load
+pwsh ./docker/windows/build.ps1 -DotnetVersion "10.0" -DockerRepository "maui-build" -Load
 ```
 
 ### Test Images
@@ -142,14 +102,33 @@ pwsh ./gitea-runner/gitea-runner-build.ps1 \
 
 ```bash
 # Build with specific Android API level
-pwsh ./test/build.ps1 \
+pwsh ./docker/test/build.ps1 \
   -DotnetVersion "9.0" \
   -AndroidSdkApiLevel 35 \
   -DockerRepository "maui-testing" \
   -Load
 
 # Run test container with emulator
-pwsh ./test/run.ps1 -AndroidSdkApiLevel 35
+pwsh ./docker/test/run.ps1 -AndroidSdkApiLevel 35
+```
+
+### Using Runners in Docker Images
+
+All Docker images support both GitHub Actions and Gitea Actions runners through environment variables:
+
+#### GitHub Actions Runner
+```bash
+docker run -e GITHUB_TOKEN=ghp_xxx -e GITHUB_ORG=your-org maui-build:latest
+```
+
+#### Gitea Actions Runner
+```bash
+docker run -e GITEA_INSTANCE_URL=https://gitea.example.com -e GITEA_RUNNER_TOKEN=your-token maui-build:latest
+```
+
+#### Development Mode (No Runners)
+```bash
+docker run -it maui-build:latest pwsh
 ```
 
 ---
@@ -596,16 +575,16 @@ ls -la ~/installed-software*
 
 ```bash
 # Docker Linux - .NET 9.0
-pwsh ./base/linux/build.ps1 -DotnetVersion "9.0" -DockerRepository "maui-build" -Load
+pwsh ./docker/linux/build.ps1 -DotnetVersion "9.0" -DockerRepository "maui-build" -Load
 
 # Docker Linux - .NET 10.0
-pwsh ./base/linux/build.ps1 -DotnetVersion "10.0" -DockerRepository "maui-build" -Load
+pwsh ./docker/linux/build.ps1 -DotnetVersion "10.0" -DockerRepository "maui-build" -Load
 
 # Tart VM - .NET 9.0
-pwsh ./macos/tart/scripts/quick-start.ps1 -BuildType maui -DotnetChannel 9.0
+pwsh ./tart/macos/scripts/quick-start.ps1 -BuildType maui -DotnetChannel 9.0
 
 # Tart VM - .NET 10.0
-pwsh ./macos/tart/scripts/quick-start.ps1 -BuildType maui -DotnetChannel 10.0
+pwsh ./tart/macos/scripts/quick-start.ps1 -BuildType maui -DotnetChannel 10.0
 ```
 
 ### View All Manifests

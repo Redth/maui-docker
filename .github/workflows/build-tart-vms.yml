@@ -139,7 +139,7 @@ jobs:
           Write-Host "  $($_.Key): $($_.Value)"
         }
 
-        cd macos/tart/scripts
+        cd tart/macos/scripts
         ./build.ps1 @buildArgs
 
     - name: 📊 Verify Build
