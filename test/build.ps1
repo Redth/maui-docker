@@ -3,7 +3,7 @@
 # The purpose is to provide a quick emulator for the specified API level.
 
 Param(
-    [String]$DockerRepository="redth/maui-testing",
+    [String]$DockerRepository="ghcr.io/maui-containers/maui-emulator-linux",
     [String]$DockerPlatform="linux/amd64",
     [String]$AndroidSdkApiLevel=35,
     [String]$Version="latest",
@@ -11,6 +11,7 @@ Param(
     [String]$DotnetVersion="9.0",
     [String]$AppiumVersion="",
     [String]$AppiumUIAutomator2DriverVersion="",
+    [String]$BuildSha="",
     [Bool]$Load=$true,
     [Bool]$Push=$false,
     [bool]$UseBuildx=$true) 
@@ -73,9 +74,6 @@ $androidJdkMajorVersion = "17"
 $androidAvdSystemImageType = "google_apis"
 $androidAvdDeviceType = "Nexus 5X"
 
-# For Docker tags, use a simplified version string
-$dotnetCommandWorkloadSetVersion = "$DotnetVersion.0"
-
 Write-Host "Android SDK configuration:"
 Write-Host "  API Level: $AndroidSdkApiLevel (from parameter - this is what the emulator will use)"
 Write-Host "  Build Tools Version: $androidBuildToolsVersion"
@@ -83,6 +81,9 @@ Write-Host "  Command Line Tools Version: $androidCmdLineToolsVersion"
 Write-Host "  JDK Major Version: $androidJdkMajorVersion"
 Write-Host "  System Image Type: $androidAvdSystemImageType"
 Write-Host "  AVD Device Type: $androidAvdDeviceType"
+
+# For Docker tags, use a simplified workload version string since we don't detect workloads
+$dotnetCommandWorkloadSetVersion = if ($WorkloadSetVersion) { $WorkloadSetVersion } else { "$DotnetVersion.0" }
 
 # NOTE: Commented out workload-based Android SDK component detection
 # Uncomment below if you need to restore workload-based version detection.
@@ -133,14 +134,30 @@ Write-Host "  AVD Device Type: $androidAvdDeviceType"
 # Write-Host "Using Android SDK API Level: $AndroidSdkApiLevel (from parameter/matrix)"
 # Write-Host "Workload default API Level: $($androidDetails.ApiLevel) (will be available in the built image)"
 
+# Build tags following the unified naming scheme:
+# - android{XX}-dotnet{X.Y} - Latest workload for this .NET version
+# - android{XX}-dotnet{X.Y}-workloads{X.Y.Z} - Specific workload version
+# - android{XX}-dotnet{X.Y}-workloads{X.Y.Z}-v{sha} - SHA-pinned version (optional)
+$tags = @()
+
+# 1. android{XX}-dotnet{X.Y} tag (this is the "latest" for this .NET version + API level)
+$dotnetTag = "${DockerRepository}:android${AndroidSdkApiLevel}-dotnet${DotnetVersion}"
+$tags += $dotnetTag
+
+# 2. android{XX}-dotnet{X.Y}-workloads{X.Y.Z} tag
+$workloadTag = "${DockerRepository}:android${AndroidSdkApiLevel}-dotnet${DotnetVersion}-workloads${dotnetCommandWorkloadSetVersion}"
+$tags += $workloadTag
+
+# 3. Optional: android{XX}-dotnet{X.Y}-workloads{X.Y.Z}-v{sha} tag
+if ($BuildSha) {
+    $shaTag = "${DockerRepository}:android${AndroidSdkApiLevel}-dotnet${DotnetVersion}-workloads${dotnetCommandWorkloadSetVersion}-v${BuildSha}"
+    $tags += $shaTag
+}
+
 Write-Host "Docker tags that will be created:"
-Write-Host "  ${DockerRepository}:${dockerTagBase}-android${AndroidSdkApiLevel}-v${Version}"
-Write-Host "  ${DockerRepository}:${dockerTagBase}-android${AndroidSdkApiLevel}"
-Write-Host "  ${DockerRepository}:${dockerTagBase}-android${AndroidSdkApiLevel}-dotnet${DotnetVersion}-${Version}"
-Write-Host "  ${DockerRepository}:${dockerTagBase}-dotnet${DotnetVersion}-android${AndroidSdkApiLevel}"
-Write-Host "  ${DockerRepository}:${dockerTagBase}-dotnet${DotnetVersion}-android${AndroidSdkApiLevel}-v${Version}"
-Write-Host "  ${DockerRepository}:${dockerTagBase}-dotnet${DotnetVersion}-workloads${dotnetCommandWorkloadSetVersion}-android${AndroidSdkApiLevel}"
-Write-Host "  ${DockerRepository}:${dockerTagBase}-dotnet${DotnetVersion}-workloads${dotnetCommandWorkloadSetVersion}-android${AndroidSdkApiLevel}-v${Version}"
+foreach ($tag in $tags) {
+    Write-Host "  $tag"
+}
 
 # Define docker arguments
 $commonArgs = @(
@@ -153,17 +170,14 @@ $commonArgs = @(
     "--build-arg", "APPIUM_UIAUTOMATOR2_DRIVER_VERSION=$AppiumUIAutomator2DriverVersion",
     "--build-arg", "JDK_MAJOR_VERSION=$androidJdkMajorVersion",
     "--build-arg", "DOTNET_VERSION=$DotnetVersion",
-    # Tags
-    "-t", "${DockerRepository}:${dockerTagBase}-android${AndroidSdkApiLevel}-v${Version}",
-    "-t", "${DockerRepository}:${dockerTagBase}-android${AndroidSdkApiLevel}",
-    "-t", "${DockerRepository}:${dockerTagBase}-android${AndroidSdkApiLevel}-dotnet${DotnetVersion}-${Version}",
-    "-t", "${DockerRepository}:${dockerTagBase}-dotnet${DotnetVersion}-android${AndroidSdkApiLevel}",
-    "-t", "${DockerRepository}:${dockerTagBase}-dotnet${DotnetVersion}-android${AndroidSdkApiLevel}-v${Version}",
-    "-t", "${DockerRepository}:${dockerTagBase}-dotnet${DotnetVersion}-workloads${dotnetCommandWorkloadSetVersion}-android${AndroidSdkApiLevel}",
-    "-t", "${DockerRepository}:${dockerTagBase}-dotnet${DotnetVersion}-workloads${dotnetCommandWorkloadSetVersion}-android${AndroidSdkApiLevel}-v${Version}",
     "-f", "Dockerfile",
     "."
 )
+
+# Add all tags
+foreach ($tag in $tags) {
+    $commonArgs += @("-t", $tag)
+}
 
 $dockerArgs = @()
 if ($UseBuildx) {

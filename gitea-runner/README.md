@@ -27,7 +27,7 @@ docker run -d \
   -e GITEA_RUNNER_TOKEN="your-registration-token" \
   -e GITEA_RUNNER_NAME="maui-linux-1" \
   -e GITEA_RUNNER_LABELS="maui,linux,amd64,dotnet10" \
-  redth/maui-gitea-runner:linux-dotnet10.0
+  maui-containers/maui-gitea-runner-linux:dotnet10.0
 
 # Windows
 docker run -d `
@@ -35,7 +35,7 @@ docker run -d `
   -e GITEA_RUNNER_TOKEN="your-registration-token" `
   -e GITEA_RUNNER_NAME="maui-windows-1" `
   -e GITEA_RUNNER_LABELS="maui,windows,amd64,dotnet10" `
-  redth/maui-gitea-runner:windows-dotnet10.0
+  maui-containers/maui-gitea-runner-windows:dotnet10.0
 ```
 
 ## Getting a Runner Token

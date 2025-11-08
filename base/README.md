@@ -30,7 +30,7 @@ These base images can be used as the foundation for:
 ### Example Dockerfile using the base image:
 
 ```dockerfile
-FROM redth/maui-build:linux-latest
+FROM maui-containers/maui-linux:dotnet10.0
 
 # Add your custom requirements here
 COPY your-app /app

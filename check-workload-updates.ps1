@@ -13,13 +13,13 @@
     The .NET version to check for workload sets. Defaults to "9.0".
 
 .PARAMETER DockerRepository
-    The Docker repository to check for existing tags. Defaults to "redth/maui-actions-runner".
+    The Docker repository to check for existing tags. Defaults to "ghcr.io/maui-containers/maui-actions-runner-linux".
 
 .PARAMETER TestDockerRepository
-    The test Docker repository to check for existing tags. Defaults to "redth/maui-testing".
+    The test Docker repository to check for existing tags. Defaults to "ghcr.io/maui-containers/maui-emulator-linux".
 
 .PARAMETER BaseDockerRepository
-    The base Docker repository to check for existing tags. Defaults to "redth/maui-build".
+    The base Docker repository to check for existing tags. Defaults to "ghcr.io/maui-containers/maui-linux".
 
 .PARAMETER TagPattern
     The tag pattern to look for. The script will replace placeholders with actual values:
@@ -57,15 +57,15 @@
 param(
     [Parameter(Position = 0)]
     [string]$DotnetVersion = "9.0",
-    
+
     [Parameter(Position = 1)]
-    [string]$DockerRepository = "redth/maui-actions-runner",
-    
+    [string]$DockerRepository = "ghcr.io/maui-containers/maui-actions-runner-linux",
+
     [Parameter(Position = 2)]
-    [string]$TestDockerRepository = "redth/maui-testing",
-    
+    [string]$TestDockerRepository = "ghcr.io/maui-containers/maui-emulator-linux",
+
     [Parameter(Position = 3)]
-    [string]$BaseDockerRepository = "redth/maui-build",
+    [string]$BaseDockerRepository = "ghcr.io/maui-containers/maui-linux",
     
     [Parameter(Position = 4)]
     [string]$TagPattern = "{platform}-dotnet{dotnet_version}-workloads{workload_version}",

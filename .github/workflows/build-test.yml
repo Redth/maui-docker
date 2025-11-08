@@ -28,9 +28,6 @@ on:
   repository_dispatch:
     types: [trigger-test-build]
 
-env:
-  DOCKER_REPOSITORY: redth/maui-testing
-
 jobs:
   get-workload-info:
     name: 🔍 Get Workload Information
@@ -166,11 +163,12 @@ jobs:
     - name: 🛒 Checkout
       uses: actions/checkout@v4
 
-    - name: 🐋 DockerHub
+    - name: 🐋 Login to GitHub Container Registry
       uses: docker/login-action@v3
       with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: 🔨 Build Docker Image
       shell: pwsh
@@ -179,7 +177,6 @@ jobs:
         # Build arguments
         $buildArgs = @{
           AndroidSdkApiLevel  = "${{ matrix.android_api_level }}"
-          DockerRepository    = "${{ env.DOCKER_REPOSITORY }}"
           Version             = "${{ github.run_id }}"
           Load                = $true
         }
@@ -187,12 +184,12 @@ jobs:
         if ("${{ github.ref }}" -eq "refs/heads/main") {
           $buildArgs.Push = $true
         }
-        
+
         # Add workload set version if specified
         if ("${{ needs.get-workload-info.outputs.workload-set-version }}" -ne "") {
           $buildArgs.WorkloadSetVersion = "${{ needs.get-workload-info.outputs.workload-set-version }}"
         }
-        
+
         # Add .NET version from matrix
         $buildArgs.DotnetVersion = "${{ matrix.dotnet_version }}"
 
@@ -200,11 +197,11 @@ jobs:
         if ("${{ inputs.appium_version }}" -ne "") {
           $buildArgs.AppiumVersion = "${{ inputs.appium_version }}"
         }
-        
+
         if ("${{ inputs.appium_uiautomator2_driver_version }}" -ne "") {
           $buildArgs.AppiumUIAutomator2DriverVersion = "${{ inputs.appium_uiautomator2_driver_version }}"
         }
-        
+
         ./build.ps1 @buildArgs
 
 

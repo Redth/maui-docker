@@ -15,24 +15,119 @@ This repository provides comprehensive tooling for .NET MAUI development:
    - Includes both GitHub and Gitea Actions runners
    - Supports multiple Xcode versions
 
+## Image Naming & Tag Format
+
+All images follow a unified naming scheme for consistency across Docker and Tart platforms.
+
+### Repository Organization
+
+Images are published under the `maui-containers` organization:
+
+**Docker Hub / GHCR:**
+- `maui-containers/maui-linux` - Linux development images
+- `maui-containers/maui-windows` - Windows development images
+- `maui-containers/maui-macos` - macOS VM images (Tart)
+- `maui-containers/maui-emulator-linux` - Linux images with Android Emulator + Appium
+
+### Tag Format
+
+All images use a consistent tag format with platform/OS identifiers and version information:
+
+**Pattern:** `{platform-identifier}-dotnet{X.Y}-workloads{X.Y.Z}[-v{sha}]`
+
+**Tag Variants:**
+
+1. **`{platform}-dotnet{X.Y}`** - Latest workload set for this .NET version
+2. **`{platform}-dotnet{X.Y}-workloads{X.Y.Z}`** - Specific workload version
+3. **`{platform}-dotnet{X.Y}-workloads{X.Y.Z}-v{sha}`** - SHA-pinned build (optional)
+
+### Examples by Platform
+
+#### Linux Base Images
+```
+# .NET 10.0
+maui-containers/maui-linux:dotnet10.0
+maui-containers/maui-linux:dotnet10.0-workloads10.0.100-rc.2.25024.3
+maui-containers/maui-linux:dotnet10.0-workloads10.0.100-rc.2.25024.3-vsha256abc
+
+# .NET 9.0
+maui-containers/maui-linux:dotnet9.0
+maui-containers/maui-linux:dotnet9.0-workloads9.0.305
+maui-containers/maui-linux:dotnet9.0-workloads9.0.305-vsha256abc
+```
+
+#### Windows Base Images
+```
+# .NET 10.0
+maui-containers/maui-windows:dotnet10.0
+maui-containers/maui-windows:dotnet10.0-workloads10.0.100-rc.2.25024.3
+maui-containers/maui-windows:dotnet10.0-workloads10.0.100-rc.2.25024.3-vsha256abc
+
+# .NET 9.0
+maui-containers/maui-windows:dotnet9.0
+maui-containers/maui-windows:dotnet9.0-workloads9.0.305
+maui-containers/maui-windows:dotnet9.0-workloads9.0.305-vsha256abc
+```
+
+#### macOS VM Images (includes OS version)
+```
+# .NET 10.0
+maui-containers/maui-macos:tahoe-dotnet10.0
+maui-containers/maui-macos:tahoe-dotnet10.0-workloads10.0.100-rc.2.25024.3
+maui-containers/maui-macos:tahoe-dotnet10.0-workloads10.0.100-rc.2.25024.3-vsha256abc
+
+# .NET 9.0
+maui-containers/maui-macos:tahoe-dotnet9.0
+maui-containers/maui-macos:tahoe-dotnet9.0-workloads9.0.305
+maui-containers/maui-macos:tahoe-dotnet9.0-workloads9.0.305-vsha256abc
+```
+
+#### Emulator/Test Images (includes Android API level)
+```
+# Android 35 with .NET 10.0
+maui-containers/maui-emulator-linux:android35-dotnet10.0
+maui-containers/maui-emulator-linux:android35-dotnet10.0-workloads10.0.100-rc.2.25024.3
+
+# Android 34 with .NET 9.0
+maui-containers/maui-emulator-linux:android34-dotnet9.0
+maui-containers/maui-emulator-linux:android34-dotnet9.0-workloads9.0.305
+```
+
+### Platform Identifiers
+
+| Platform | Identifier | Notes |
+|----------|-----------|-------|
+| Linux | (none) | No OS version needed |
+| Windows | (none) | No OS version needed |
+| macOS | `tahoe`, `sequoia` | OS version included for Xcode compatibility |
+| Android Emulator | `android{XX}` | API level number (23-35) |
+
+### Why This Format?
+
+- **Always includes .NET version** - No ambiguity about which .NET version is installed
+- **Workload versions explicit** - Pin to specific workload sets for reproducible builds
+- **SHA pinning optional** - For maximum reproducibility when needed
+- **Platform-aware** - macOS includes OS version for Xcode; emulator includes API level
+- **No redundant tags** - Removed ambiguous `:latest` and platform-only tags
+
 ## Base Images
 
 Base images provide a complete .NET MAUI development environment without the GitHub Actions runner. These are perfect for general development containers, custom CI/CD setups, or as foundation images for other specialized containers.
 
-- Linux: ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-build/linux-latest?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-build%2Ftags)
-- Windows: ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-build/windows-latest?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-build%2Ftags)
+- Linux: `maui-containers/maui-linux`
+- Windows: `maui-containers/maui-windows`
 
 ### Usage:
 
-```pwsh
-# Run a Linux development container
-docker run -it redth/maui-build:linux-latest bash
+```bash
+# Run a Linux development container (.NET 10.0)
+docker run -it maui-containers/maui-linux:dotnet10.0 bash
 
-# Run a Windows development container  
-docker run -it redth/maui-build:windows-latest powershell
+# Run a Windows development container (.NET 9.0)
+docker run -it maui-containers/maui-windows:dotnet9.0 powershell
 
-# Use as base image
-FROM redth/maui-build:linux-latest
+# Use as base image with specific workload version
+FROM maui-containers/maui-linux:dotnet10.0-workloads10.0.100-rc.2.25024.3
 # Add your custom requirements here
 ```
 
@@ -54,22 +149,24 @@ See [base/README.md](base/README.md) for detailed documentation.
 
 
 
-## Test Images
+## Emulator/Test Images
 
-Test images are designed to help quickly stand up containers that are ready to use for running UI Tests with Appium on the Android Emulator.  They come setup with Appium Server and the Android Emulator (for the given API level) both running and waiting when the container is started.
+Emulator images are designed to help quickly stand up containers that are ready to use for running UI Tests with Appium on the Android Emulator. They come setup with Appium Server and the Android Emulator (for the given API level) both running and waiting when the container is started.
+
+**Repository:** `maui-containers/maui-emulator-linux`
 
 > NOTE: Only `linux/amd64` is available.
 
-## Usage:
+### Usage:
 
-```pwsh
-docker run `
-    -v C:/MyApp/bin/Debug/net9.0-android35.0/:/app `
-    --device /dev/kvm `
-    -p 5554:5554 `
-    -p 5555:5555 `
-    -p 4723:4723 `
-    redth/maui-testing:appium-emulator-linux-android35
+```bash
+docker run \
+    -v /path/to/app/bin/Debug/net10.0-android35.0/:/app \
+    --device /dev/kvm \
+    -p 5554:5554 \
+    -p 5555:5555 \
+    -p 4723:4723 \
+    maui-containers/maui-emulator-linux:android35-dotnet10.0
 ```
 
 > NOTE: Ports are mapped for the emulator, ADB, and Appium in this example.
@@ -85,26 +182,26 @@ The host folder with the built apk's can be mapped to a folder in the container.
 
 ### Variants
 
-Each Android API Level (23 through latest) has its own image variant.  You can specify different ones to use by the tag name (eg: `test-linux:android23` or `test-linux:android35`).
+Each Android API Level (23 through latest) has its own image variant.  You can specify different ones to use by the tag name (eg: `maui-emulator-linux:android23-dotnet10.0` or `maui-emulator-linux:android35-dotnet10.0`).
 
-![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-testing/appium-emulator-linux-android35?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-testing%2Ftags)
+![Docker Image Version (tag)](https://img.shields.io/docker/v/mauicontainers/maui-emulator-linux/android35-dotnet10.0?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fmauicontainers%2Fmaui-emulator-linux%2Ftags)
 
 <details>
 
 <summary>Show All Variants...</summary>
 
-- ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-testing/appium-emulator-linux-android23?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-testing%2Ftags)
-- ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-testing/appium-emulator-linux-android24?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-testing%2Ftags)
-- ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-testing/appium-emulator-linux-android25?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-testing%2Ftags)
-- ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-testing/appium-emulator-linux-android26?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-testing%2Ftags)
-- ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-testing/appium-emulator-linux-android28?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-testing%2Ftags)
-- ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-testing/appium-emulator-linux-android29?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-testing%2Ftags)
-- ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-testing/appium-emulator-linux-android30?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-testing%2Ftags)
-- ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-testing/appium-emulator-linux-android31?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-testing%2Ftags)
-- ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-testing/appium-emulator-linux-android32?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-testing%2Ftags)
-- ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-testing/appium-emulator-linux-android33?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-testing%2Ftags)
-- ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-testing/appium-emulator-linux-android34?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-testing%2Ftags)
-- ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-testing/appium-emulator-linux-android35?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-testing%2Ftags)
+- ![Docker Image Version (tag)](https://img.shields.io/docker/v/mauicontainers/maui-emulator-linux/android23-dotnet9.0?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fmauicontainers%2Fmaui-emulator-linux%2Ftags)
+- ![Docker Image Version (tag)](https://img.shields.io/docker/v/mauicontainers/maui-emulator-linux/android24-dotnet9.0?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fmauicontainers%2Fmaui-emulator-linux%2Ftags)
+- ![Docker Image Version (tag)](https://img.shields.io/docker/v/mauicontainers/maui-emulator-linux/android25-dotnet9.0?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fmauicontainers%2Fmaui-emulator-linux%2Ftags)
+- ![Docker Image Version (tag)](https://img.shields.io/docker/v/mauicontainers/maui-emulator-linux/android26-dotnet9.0?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fmauicontainers%2Fmaui-emulator-linux%2Ftags)
+- ![Docker Image Version (tag)](https://img.shields.io/docker/v/mauicontainers/maui-emulator-linux/android28-dotnet9.0?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fmauicontainers%2Fmaui-emulator-linux%2Ftags)
+- ![Docker Image Version (tag)](https://img.shields.io/docker/v/mauicontainers/maui-emulator-linux/android29-dotnet9.0?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fmauicontainers%2Fmaui-emulator-linux%2Ftags)
+- ![Docker Image Version (tag)](https://img.shields.io/docker/v/mauicontainers/maui-emulator-linux/android30-dotnet9.0?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fmauicontainers%2Fmaui-emulator-linux%2Ftags)
+- ![Docker Image Version (tag)](https://img.shields.io/docker/v/mauicontainers/maui-emulator-linux/android31-dotnet9.0?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fmauicontainers%2Fmaui-emulator-linux%2Ftags)
+- ![Docker Image Version (tag)](https://img.shields.io/docker/v/mauicontainers/maui-emulator-linux/android32-dotnet9.0?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fmauicontainers%2Fmaui-emulator-linux%2Ftags)
+- ![Docker Image Version (tag)](https://img.shields.io/docker/v/mauicontainers/maui-emulator-linux/android33-dotnet9.0?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fmauicontainers%2Fmaui-emulator-linux%2Ftags)
+- ![Docker Image Version (tag)](https://img.shields.io/docker/v/mauicontainers/maui-emulator-linux/android34-dotnet9.0?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fmauicontainers%2Fmaui-emulator-linux%2Ftags)
+- ![Docker Image Version (tag)](https://img.shields.io/docker/v/mauicontainers/maui-emulator-linux/android35-dotnet10.0?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fmauicontainers%2Fmaui-emulator-linux%2Ftags)
  
 </details>
 
@@ -126,8 +223,8 @@ Linux should work fine as long as you have [kvm virtualization support](https://
 
 Runner images build upon the base images and add the GitHub Actions runner service. They're designed for self-hosted CI/CD scenarios where you need the full MAUI development stack.
 
-- Linux: ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-actions-runner/linux-dotnet9.0?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-actions-runner%2Ftags)
-- Windows: ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-actions-runner/windows-dotnet9.0?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-actions-runner%2Ftags)
+- Linux: ![Docker Image Version (tag)](https://img.shields.io/docker/v/mauicontainers/maui-actions-runner-linux/dotnet10.0?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fmauicontainers%2Fmaui-actions-runner-linux%2Ftags)
+- Windows: ![Docker Image Version (tag)](https://img.shields.io/docker/v/mauicontainers/maui-actions-runner-windows/dotnet10.0?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fmauicontainers%2Fmaui-actions-runner-windows%2Ftags)
 
 These images now derive from the base images, providing better separation of concerns and reduced duplication.
 
@@ -146,7 +243,7 @@ docker run `
     -e GITHUB_ORG=myorg `
     -e GITHUB_REPO=myrepo `
     -e GITHUB_TOKEN=myaccesstoken `
-    redth/maui-actions-runner:windows-dotnet9.0
+    maui-containers/maui-actions-runner-windows:dotnet9.0
 ```
 
 > NOTE: You can omit the `GITHUB_REPO` to install the runner at the organization level, but make sure you have an access token (PAT) with the correct access at this level to do so.
@@ -181,8 +278,8 @@ docker run `
 
 Runner images build upon the base images and add the Gitea Actions runner service. They're designed for self-hosted CI/CD scenarios with Gitea where you need the full MAUI development stack.
 
-- Linux: ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-gitea-runner/linux-dotnet9.0?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-gitea-runner%2Ftags)
-- Windows: ![Docker Image Version (tag)](https://img.shields.io/docker/v/redth/maui-gitea-runner/windows-dotnet9.0?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fredth%2Fmaui-gitea-runner%2Ftags)
+- Linux: ![Docker Image Version (tag)](https://img.shields.io/docker/v/mauicontainers/maui-gitea-runner-linux/dotnet10.0?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fmauicontainers%2Fmaui-gitea-runner-linux%2Ftags)
+- Windows: ![Docker Image Version (tag)](https://img.shields.io/docker/v/mauicontainers/maui-gitea-runner-windows/dotnet10.0?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fmauicontainers%2Fmaui-gitea-runner-windows%2Ftags)
 
 These images derive from the base images and include the Gitea `act_runner` binary for seamless integration with Gitea Actions.
 
@@ -200,7 +297,7 @@ Runner images are intended to make it really easy to stand up self-hosted build 
 docker run `
     -e GITEA_INSTANCE_URL=https://gitea.example.com `
     -e GITEA_RUNNER_TOKEN=your_runner_token `
-    redth/maui-gitea-runner:linux-dotnet9.0
+    maui-containers/maui-gitea-runner-linux:dotnet9.0
 ```
 
 > NOTE: You can generate a runner registration token from your Gitea instance under Settings → Actions → Runners.
@@ -229,9 +326,13 @@ See [gitea-runner/README.md](gitea-runner/README.md) for detailed documentation.
 
 Tart VM images provide complete macOS virtual machines for .NET MAUI development, including iOS, macOS, and Android support. These VMs are pre-configured with Xcode, .NET SDK, Android SDK, and both GitHub and Gitea Actions runners.
 
-**Published Images:**
-- `ghcr.io/redth/maui-dev-tahoe-dotnet9.0`
-- `ghcr.io/redth/maui-dev-tahoe-dotnet10.0`
+**Repository:** `ghcr.io/maui-containers/maui-macos`
+
+**Available Tags:**
+- `tahoe-dotnet10.0` - .NET 10.0 on macOS Tahoe
+- `tahoe-dotnet10.0-workloads10.0.100-rc.2.25024.3` - Specific workload version
+- `tahoe-dotnet9.0` - .NET 9.0 on macOS Tahoe
+- `tahoe-dotnet9.0-workloads9.0.305` - Specific workload version
 
 Images are automatically built and published to GitHub Container Registry (ghcr.io) when workload updates are detected or when manually triggered.
 
@@ -240,15 +341,15 @@ Images are automatically built and published to GitHub Container Registry (ghcr.
 Pull and run a Tart VM:
 
 ```bash
-# Pull the latest .NET 9.0 image
-tart pull ghcr.io/redth/maui-dev-tahoe-dotnet9.0:latest
-
-# Clone and run the VM
-tart clone ghcr.io/redth/maui-dev-tahoe-dotnet9.0:latest maui-dev
+# Pull and run .NET 10.0 image
+tart clone ghcr.io/maui-containers/maui-macos:tahoe-dotnet10.0 maui-dev
 tart run maui-dev
 
 # Or run directly without cloning
-tart run ghcr.io/redth/maui-dev-tahoe-dotnet9.0:latest
+tart run ghcr.io/maui-containers/maui-macos:tahoe-dotnet10.0
+
+# Pin to a specific workload version
+tart clone ghcr.io/maui-containers/maui-macos:tahoe-dotnet10.0-workloads10.0.100-rc.2.25024.3 maui-dev
 ```
 
 ### Using with GitHub Actions
@@ -258,7 +359,7 @@ tart run ghcr.io/redth/maui-dev-tahoe-dotnet9.0:latest
 GITHUB_TOKEN=your_token \
 GITHUB_ORG=your-org \
 GITHUB_REPO=your-repo \
-tart run ghcr.io/redth/maui-dev-tahoe-dotnet9.0:latest
+tart run ghcr.io/maui-containers/maui-macos:tahoe-dotnet10.0
 ```
 
 The VM will automatically:
@@ -272,7 +373,7 @@ The VM will automatically:
 # Set environment variables and run
 GITEA_INSTANCE_URL=https://gitea.example.com \
 GITEA_RUNNER_TOKEN=your_token \
-tart run ghcr.io/redth/maui-dev-tahoe-dotnet9.0:latest
+tart run ghcr.io/maui-containers/maui-macos:tahoe-dotnet10.0
 ```
 
 ### Environment Variables

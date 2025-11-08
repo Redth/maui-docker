@@ -1,7 +1,7 @@
 Param([String]$DotnetVersion="9.0",
     [String]$WorkloadSetVersion="",
-    [String]$DockerRepository="redth/maui-gitea-runner",
-    [String]$BaseDockerRepository="redth/maui-build",
+    [String]$DockerRepository="",
+    [String]$BaseDockerRepository="",
     [String]$DockerPlatform="windows/amd64",
     [String]$Version="latest",
     [Bool]$Load=$false,
@@ -11,8 +11,20 @@ Param([String]$DotnetVersion="9.0",
 
 if ($DockerPlatform.StartsWith('linux/')) {
     $dockerTagBase = "linux"
+    if (-not $DockerRepository) {
+        $DockerRepository = "ghcr.io/maui-containers/maui-gitea-runner-linux"
+    }
+    if (-not $BaseDockerRepository) {
+        $BaseDockerRepository = "ghcr.io/maui-containers/maui-linux"
+    }
 } else {
     $dockerTagBase = "windows"
+    if (-not $DockerRepository) {
+        $DockerRepository = "ghcr.io/maui-containers/maui-gitea-runner-windows"
+    }
+    if (-not $BaseDockerRepository) {
+        $BaseDockerRepository = "ghcr.io/maui-containers/maui-windows"
+    }
 }
 # Use a more reliable method to import the common functions module
 # This handles paths with spaces better and is more explicit

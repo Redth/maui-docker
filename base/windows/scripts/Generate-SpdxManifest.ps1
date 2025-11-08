@@ -47,7 +47,7 @@ $spdx = @{
     dataLicense = "CC0-1.0"
     SPDXID = "SPDXRef-DOCUMENT"
     name = $docName
-    documentNamespace = "https://github.com/redth/maui-docker/spdx/$docName-$docUuid"
+    documentNamespace = "https://github.com/maui-containers/maui-docker/spdx/$docName-$docUuid"
     creationInfo = @{
         created = $generatedAt
         creators = @(
@@ -185,4 +185,4 @@ $jsonOutput | Set-Content -Path $OutputFile -Encoding UTF8
 
 Write-Host "SPDX 2.3 SBOM generated: $OutputFile"
 Write-Host "Document: $docName"
-Write-Host "Namespace: https://github.com/redth/maui-docker/spdx/$docName-$docUuid"
+Write-Host "Namespace: https://github.com/maui-containers/maui-docker/spdx/$docName-$docUuid"

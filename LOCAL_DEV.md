@@ -299,7 +299,7 @@ tart clone maui-vm.tar.gz imported-vm
 
 ```bash
 # Pull from GitHub Container Registry
-tart clone ghcr.io/redth/maui-dev-tahoe-dotnet10.0 maui-dev-tahoe-dotnet10.0
+tart clone ghcr.io/maui-containers/maui-macos:tahoe-dotnet10.0 maui-dev-tahoe-dotnet10.0
 
 # Run the pulled VM
 tart run maui-dev-tahoe-dotnet10.0

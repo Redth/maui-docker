@@ -22,6 +22,6 @@ if ($bindAdbKeys) {
 }
 
 
-$runArgs += "redth/maui-testing:appium-emulator-linux-android$AndroidSdkApiLevel"
+$runArgs += "maui-containers/maui-emulator-linux:android$AndroidSdkApiLevel-dotnet9.0"
 
 & docker $runArgs

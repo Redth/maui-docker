@@ -41,7 +41,7 @@ env:
   DOTNET_CHANNEL: ${{ inputs.dotnet_channel || '10.0' }}
   IMAGE_TYPE: ${{ inputs.image_type || 'maui' }}
   WORKLOAD_SET_VERSION: ${{ inputs.workload_set_version }}
-  TART_REGISTRY: ghcr.io/${{ github.repository_owner }}
+  TART_REGISTRY: ghcr.io/maui-containers
 
 jobs:
   build-tart-macos:

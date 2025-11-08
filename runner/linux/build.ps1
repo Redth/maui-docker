@@ -1,6 +1,6 @@
 Param([String]$DotnetVersion="9.0",
     [String]$WorkloadSetVersion="",
-    [String]$DockerRepository="redth/maui-actions-runner",
+    [String]$DockerRepository="maui-containers/maui-actions-runner-linux",
     [String]$Version="latest",
     [Bool]$Load=$false,
     [Bool]$Push=$false) 

@@ -1,7 +1,7 @@
 # Use MAUI base image
-ARG BASE_IMAGE_TAG=latest
-ARG BASE_DOCKER_REPOSITORY=redth/maui-build
-FROM ${BASE_DOCKER_REPOSITORY}:linux-${BASE_IMAGE_TAG}
+ARG BASE_IMAGE_TAG=dotnet9.0
+ARG BASE_DOCKER_REPOSITORY=ghcr.io/maui-containers/maui-linux
+FROM ${BASE_DOCKER_REPOSITORY}:${BASE_IMAGE_TAG}
 
 # Define environment variables for Gitea runner registration
 # Default to empty values, will be overridden by values from docker-compose

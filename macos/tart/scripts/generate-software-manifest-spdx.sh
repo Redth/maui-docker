@@ -55,7 +55,7 @@ cat > "${TEMP_FILE}" << EOF
   "dataLicense": "CC0-1.0",
   "SPDXID": "SPDXRef-DOCUMENT",
   "name": "${DOC_NAME}",
-  "documentNamespace": "https://github.com/redth/maui-docker/spdx/${DOC_NAME}-${DOC_UUID}",
+  "documentNamespace": "https://github.com/maui-containers/maui-docker/spdx/${DOC_NAME}-${DOC_UUID}",
   "creationInfo": {
     "created": "${GENERATED_AT}",
     "creators": [
@@ -267,7 +267,7 @@ fi
 
 echo "SPDX 2.3 SBOM generated: ${OUTPUT_FILE}"
 echo "Document: ${DOC_NAME}"
-echo "Namespace: https://github.com/redth/maui-docker/spdx/${DOC_NAME}-${DOC_UUID}"
+echo "Namespace: https://github.com/maui-containers/maui-docker/spdx/${DOC_NAME}-${DOC_UUID}"
 
 # Create symlink in home directory
 if [[ -d "${HOME}" ]]; then

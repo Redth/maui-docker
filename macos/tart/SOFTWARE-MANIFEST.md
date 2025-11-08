@@ -120,7 +120,7 @@ jq . installed-software.cdx.json
 
 ```bash
 # Clone the image if not already local
-tart clone ghcr.io/redth/maui-dev-tahoe-dotnet10.0 maui-dev-tahoe-dotnet10.0
+tart clone ghcr.io/maui-containers/maui-macos:tahoe-dotnet10.0 maui-dev-tahoe-dotnet10.0
 
 # Mount the image filesystem (requires root)
 # Note: This is advanced usage and may vary by macOS version
@@ -348,7 +348,7 @@ The SPDX 2.3 SBOM follows the ISO/IEC 5962:2021 standard with this structure:
   "dataLicense": "CC0-1.0",
   "SPDXID": "SPDXRef-DOCUMENT",
   "name": "maui-dev-tahoe-dotnet10.0",
-  "documentNamespace": "https://github.com/redth/maui-docker/spdx/...",
+  "documentNamespace": "https://github.com/maui-containers/maui-docker/spdx/...",
   "creationInfo": {
     "created": "2025-01-06T12:00:00Z",
     "creators": [

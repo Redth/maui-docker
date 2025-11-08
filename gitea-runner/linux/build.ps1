@@ -1,6 +1,6 @@
 Param([String]$DotnetVersion="9.0",
     [String]$WorkloadSetVersion="",
-    [String]$DockerRepository="redth/maui-gitea-runner",
+    [String]$DockerRepository="maui-containers/maui-gitea-runner-linux",
     [String]$Version="latest",
     [Bool]$Load=$false,
     [Bool]$Push=$false)

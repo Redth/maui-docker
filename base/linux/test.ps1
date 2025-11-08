@@ -2,7 +2,7 @@
 $buildArgs = @{
   DotNetVersion     = "9.0"
   Version           = "16091125574"
-  DockerRepository  = "redth/maui-build"
+  DockerRepository  = "ghcr.io/maui-containers"
   DockerPlatform    = "linux/amd64"
   Load              = $true
 }

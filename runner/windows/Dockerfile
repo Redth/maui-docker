@@ -1,7 +1,7 @@
 # Use MAUI base image
-ARG BASE_IMAGE_TAG=latest
-ARG BASE_DOCKER_REPOSITORY=redth/maui-build
-FROM ${BASE_DOCKER_REPOSITORY}:windows-${BASE_IMAGE_TAG}
+ARG BASE_IMAGE_TAG=dotnet9.0
+ARG BASE_DOCKER_REPOSITORY=ghcr.io/maui-containers/maui-windows
+FROM ${BASE_DOCKER_REPOSITORY}:${BASE_IMAGE_TAG}
 
 # Set build arguments for GitHub Actions Runner
 ARG GITHUB_ACTIONS_RUNNER_VERSION=2.323.0

@@ -1,15 +1,22 @@
 Param([String]$DotnetVersion="9.0",
     [String]$WorkloadSetVersion="",
-    [String]$DockerRepository="redth/maui-build",
-    [String]$DockerPlatform="windows/amd64",
+    [String]$DockerRepository="",
+    [String]$DockerPlatform="linux/amd64",
     [String]$Version="latest",
+    [String]$BuildSha="",
     [Bool]$Load=$false,
     [Bool]$Push=$false)
 
 if ($DockerPlatform.StartsWith('linux/')) {
     $dockerTagBase = "linux"
+    if (-not $DockerRepository) {
+        $DockerRepository = "ghcr.io/maui-containers/maui-linux"
+    }
 } else {
     $dockerTagBase = "windows"
+    if (-not $DockerRepository) {
+        $DockerRepository = "ghcr.io/maui-containers/maui-windows"
+    }
 }
 
 # Use a more reliable method to import the common functions module
@@ -74,35 +81,46 @@ if (-not (Test-Path -Path $contextPath -PathType Container)) {
 
 Write-Host "Using build context: $contextPath"
 
-# Build multiple tags for consistency with runner images
-$primaryTag = "$DockerRepository`:$dockerTagBase-$Version"
-$dotnetTag = "$DockerRepository`:$dockerTagBase-dotnet$DotnetVersion"
-$dotnetVersionedTag = "$DockerRepository`:$dockerTagBase-dotnet$DotnetVersion-$Version"
-$workloadTag = "$DockerRepository`:$dockerTagBase-dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion"
-$versionedTag = "$DockerRepository`:$dockerTagBase-dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion-v$Version"
+# Build tags following the unified naming scheme:
+# - dotnet{X.Y} - Latest workload for this .NET version
+# - dotnet{X.Y}-workloads{X.Y.Z} - Specific workload version
+# - dotnet{X.Y}-workloads{X.Y.Z}-v{sha} - SHA-pinned version (optional)
+$tags = @()
+
+# 1. dotnet{X.Y} tag (this is the "latest" for this .NET version)
+$dotnetTag = "$DockerRepository`:dotnet$DotnetVersion"
+$tags += $dotnetTag
+
+# 2. dotnet{X.Y}-workloads{X.Y.Z} tag
+$workloadTag = "$DockerRepository`:dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion"
+$tags += $workloadTag
+
+# 3. Optional: dotnet{X.Y}-workloads{X.Y.Z}-v{sha} tag
+if ($BuildSha) {
+    $shaTag = "$DockerRepository`:dotnet$DotnetVersion-workloads$dotnetCommandWorkloadSetVersion-v$BuildSha"
+    $tags += $shaTag
+}
 
 Write-Host "Building Docker image with tags:"
-Write-Host "  Primary: $primaryTag"
-Write-Host "  .NET: $dotnetTag"
-Write-Host "  .NET Versioned: $dotnetVersionedTag"
-Write-Host "  Workloads: $workloadTag"
-Write-Host "  Versioned: $versionedTag"
+foreach ($tag in $tags) {
+    Write-Host "  $tag"
+}
 
 # Prepare Docker build arguments
 $buildArgs = @(
     "--build-arg", "DOTNET_VERSION=$DotnetVersion",
     "--build-arg", "JDK_MAJOR_VERSION=$($androidDetails.JdkMajorVersion)",
-    "--build-arg", "ANDROID_SDK_API_LEVEL=$($androidDetails.ApiLevel)", 
+    "--build-arg", "ANDROID_SDK_API_LEVEL=$($androidDetails.ApiLevel)",
     "--build-arg", "ANDROID_SDK_BUILD_TOOLS_VERSION=$($androidDetails.BuildToolsVersion)",
     "--build-arg", "ANDROID_SDK_CMDLINE_TOOLS_VERSION=$($androidDetails.CmdLineToolsVersion)",
     "--build-arg", "DOTNET_WORKLOADS_VERSION=$dotnetCommandWorkloadSetVersion",
-    "--platform", $DockerPlatform,
-    "--tag", $primaryTag,
-    "--tag", $dotnetTag,
-    "--tag", $dotnetVersionedTag,
-    "--tag", $workloadTag,
-    "--tag", $versionedTag
+    "--platform", $DockerPlatform
 )
+
+# Add all tags
+foreach ($tag in $tags) {
+    $buildArgs += @("--tag", $tag)
+}
 
 # Add load flag if specified (only supported by buildx, not regular docker build)
 # Regular docker build automatically makes images available locally
@@ -135,18 +153,16 @@ try {
     
     # Push if requested
     if ($Push) {
-        $tagsToPush = @($primaryTag, $dotnetTag, $dotnetVersionedTag, $workloadTag, $versionedTag)
-        
-        foreach ($tag in $tagsToPush) {
+        foreach ($tag in $tags) {
             Write-Host "Pushing image: $tag"
             & docker push $tag
-            
+
             if ($LASTEXITCODE -ne 0) {
                 Write-Error "Docker push failed for $tag with exit code $LASTEXITCODE"
                 exit $LASTEXITCODE
             }
         }
-        
+
         Write-Host "Docker push completed successfully!"
     }
     

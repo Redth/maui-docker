@@ -16,9 +16,9 @@ on:
         type: boolean
 
 env:
-  DOCKER_REPOSITORY_BASE: redth/maui-build
-  DOCKER_REPOSITORY_RUNNER: redth/maui-actions-runner
-  DOCKER_REPOSITORY_TEST: redth/maui-testing
+  DOCKER_REPOSITORY_BASE: ghcr.io/maui-containers/maui-linux
+  DOCKER_REPOSITORY_RUNNER: ghcr.io/maui-containers/maui-actions-runner
+  DOCKER_REPOSITORY_TEST: ghcr.io/maui-containers/maui-emulator-linux
 
 jobs:
   check-updates:

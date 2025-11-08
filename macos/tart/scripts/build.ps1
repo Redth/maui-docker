@@ -17,9 +17,11 @@ Param(
     [string]$ImageName = "",
     [string]$BaseImage = "",
     [string]$Registry = "",
+    [string]$BuildSha = "",
     [int]$CPUCount = 4,
     [int]$MemoryGB = 8,
     [switch]$Push,
+    [switch]$PushOnly,
     [switch]$DryRun,
     [switch]$Force
 )
@@ -180,17 +182,26 @@ if ($MacOSVersion -and $DotnetChannel) {
 
 # Set default image name if not provided
 if (-not $ImageName) {
-    # Use .NET channel in name to differentiate between versions
-    $dotnetSuffix = if ($DotnetChannel) { "-dotnet$($DotnetChannel)" } else { "" }
-    $suffix = if ($Registry) { $dotnetSuffix } else { "-$MacOSVersion$dotnetSuffix" }
-    $ImageName = switch ($ImageType) {
-        "maui" { "maui-dev$suffix" }
-        "ci" { "maui-ci$suffix" }
+    # When pushing to registry, use standardized image name (maui-macos)
+    # When building locally, include version info in the name for easy identification
+    if ($Registry) {
+        $ImageName = switch ($ImageType) {
+            "maui" { "maui-macos" }
+            "ci" { "maui-ci-macos" }
+        }
+    } else {
+        # Local builds include version in name for easy identification
+        $dotnetSuffix = if ($DotnetChannel) { "-dotnet$($DotnetChannel)" } else { "" }
+        $suffix = "-$MacOSVersion$dotnetSuffix"
+        $ImageName = switch ($ImageType) {
+            "maui" { "maui-dev$suffix" }
+            "ci" { "maui-ci$suffix" }
+        }
     }
 }
 
-# Set base image for layered builds
-if (-not $BaseImage) {
+# Set base image for layered builds (not needed for push-only mode)
+if (-not $PushOnly -and -not $BaseImage) {
     $BaseImage = switch ($ImageType) {
         "maui" {
             if (-not $BaseXcodeVersion) {
@@ -207,21 +218,34 @@ if (-not $BaseImage) {
     }
 }
 
-Write-Host "Building Tart VM Image"
-Write-Host "===================="
+if ($PushOnly) {
+    Write-Host "Pushing Tart VM Image"
+    Write-Host "====================="
+} else {
+    Write-Host "Building Tart VM Image"
+    Write-Host "======================"
+}
 Write-Host "Image Type: $ImageType"
 Write-Host "macOS Version: $MacOSVersion"
 Write-Host ".NET Channel: $DotnetChannel"
-if ($BaseXcodeVersion) {
+if ($BaseXcodeVersion -and -not $PushOnly) {
     Write-Host "Base Xcode Version: $BaseXcodeVersion"
 }
-if ($AdditionalXcodeVersions -and $AdditionalXcodeVersions.Count -gt 0) {
+if ($AdditionalXcodeVersions -and $AdditionalXcodeVersions.Count -gt 0 -and -not $PushOnly) {
     Write-Host "Additional Xcode Versions: $($AdditionalXcodeVersions -join ', ')"
 }
 Write-Host "Image Name: $ImageName"
-Write-Host "Base Image: $BaseImage"
-Write-Host "CPU Count: $CPUCount"
-Write-Host "Memory: ${MemoryGB}GB"
+if (-not $PushOnly) {
+    Write-Host "Base Image: $BaseImage"
+    Write-Host "CPU Count: $CPUCount"
+    Write-Host "Memory: ${MemoryGB}GB"
+}
+if ($Registry) {
+    Write-Host "Registry: $Registry"
+}
+if ($BuildSha) {
+    Write-Host "Build SHA: $BuildSha"
+}
 Write-Host "Dry Run: $($DryRun.IsPresent)"
 Write-Host ""
 
@@ -303,7 +327,10 @@ function Push-TartImage {
     param(
         [string]$ImageName,
         [string]$Registry,
-        [string]$WorkloadSetVersion
+        [string]$WorkloadSetVersion,
+        [string]$MacOSVersion,
+        [string]$DotnetChannel,
+        [string]$BuildSha
     )
 
     if (-not $Registry) {
@@ -311,18 +338,31 @@ function Push-TartImage {
         return
     }
 
-    # Build list of tags to push
+    # Build list of tags to push in the format:
+    # :{macos}-dotnet{version} (always - this is the "latest" for this .NET version)
+    # :{macos}-dotnet{version}-workloads{workloadversion} (if workload version known)
+    # :{macos}-dotnet{version}-workloads{workloadversion}-v{sha} (if build SHA provided)
     $tags = @()
 
-    # 1. Latest tag
-    # Use ${ImageName} to explicitly delimit the variable name (: has special meaning in PowerShell strings)
-    $latestTag = "$Registry/${ImageName}:latest"
-    $tags += $latestTag
+    # Validate required components
+    if (-not $MacOSVersion -or -not $DotnetChannel) {
+        throw "MacOSVersion and DotnetChannel are required for image tagging"
+    }
 
-    # 2. Workload-specific tag (if workload version is known)
+    # 1. macOS + .NET version tag (e.g., :tahoe-dotnet10.0) - this is the "latest" for this .NET version
+    $baseTag = "$MacOSVersion-dotnet$DotnetChannel"
+    $tags += "$Registry/${ImageName}:$baseTag"
+
+    # 2. macOS + .NET + Workload tag (e.g., :tahoe-dotnet10.0-workloads10.0.100-rc.2.25024.3)
     if ($WorkloadSetVersion) {
-        $workloadTag = "$Registry/${ImageName}:workloads$WorkloadSetVersion"
-        $tags += $workloadTag
+        $workloadTag = "$MacOSVersion-dotnet$DotnetChannel-workloads$WorkloadSetVersion"
+        $tags += "$Registry/${ImageName}:$workloadTag"
+
+        # 3. Add SHA-pinned tag if BuildSha is provided (e.g., :tahoe-dotnet10.0-workloads10.0.100-rc.2.25024.3-vsha256abc)
+        if ($BuildSha) {
+            $shaTag = "$workloadTag-v$BuildSha"
+            $tags += "$Registry/${ImageName}:$shaTag"
+        }
     }
 
     if ($DryRun) {
@@ -365,6 +405,15 @@ function Test-ImageExists {
 
 # Main execution
 try {
+    # Validate PushOnly mode
+    if ($PushOnly) {
+        if (-not $Registry) {
+            throw "-PushOnly requires -Registry to be specified"
+        }
+        Write-Host "Push-only mode: Skipping build, will push existing image"
+        Write-Host ""
+    }
+
     Test-Prerequisites
 
     # Resolve workload set version if not explicitly provided
@@ -385,63 +434,79 @@ try {
     }
 
     # Check if image already exists
-    if ((Test-ImageExists $ImageName) -and -not $Force) {
+    if ($PushOnly) {
+        # In push-only mode, image MUST exist
+        if (-not (Test-ImageExists $ImageName)) {
+            throw "Image '$ImageName' does not exist locally. Build it first without -PushOnly."
+        }
+        Write-Host "✓ Found local image: $ImageName"
+    } elseif ((Test-ImageExists $ImageName) -and -not $Force) {
         Write-Warning "Image '$ImageName' already exists. Use -Force to rebuild."
         exit 1
     }
 
-    # Prepare template path
-    $templateFile = "$ImageType.pkr.hcl"
-    $templatePath = Join-Path $templatesDir $templateFile
+    # Only build if not in push-only mode
+    if (-not $PushOnly) {
+        # Prepare template path
+        $templateFile = "$ImageType.pkr.hcl"
+        $templatePath = Join-Path $templatesDir $templateFile
 
-    # Prepare build variables
-    # Use the original WorkloadSetVersion parameter for the build (can be empty for auto-detect)
-    # but use resolvedWorkloadSetVersion for tagging
-    $buildVars = @{
-        "image_name" = $ImageName
-        "base_image" = $BaseImage
-        "macos_version" = $MacOSVersion
-        "dotnet_channel" = $DotnetChannel
-        "workload_set_version" = $WorkloadSetVersion
-        "base_xcode_version" = $BaseXcodeVersion
-        "additional_xcode_versions" = ($AdditionalXcodeVersions -join ",")
-        "cpu_count" = $CPUCount
-        "memory_gb" = $MemoryGB
-    }
+        # Prepare build variables
+        # Use the original WorkloadSetVersion parameter for the build (can be empty for auto-detect)
+        # but use resolvedWorkloadSetVersion for tagging
+        $buildVars = @{
+            "image_name" = $ImageName
+            "base_image" = $BaseImage
+            "macos_version" = $MacOSVersion
+            "dotnet_channel" = $DotnetChannel
+            "workload_set_version" = $WorkloadSetVersion
+            "base_xcode_version" = $BaseXcodeVersion
+            "additional_xcode_versions" = ($AdditionalXcodeVersions -join ",")
+            "cpu_count" = $CPUCount
+            "memory_gb" = $MemoryGB
+        }
 
-    # Add any additional variables from config file
-    if ($config.PSObject.Properties) {
-        foreach ($prop in $config.PSObject.Properties) {
-            if (-not $buildVars.ContainsKey($prop.Name)) {
-                $buildVars[$prop.Name] = $prop.Value
+        # Add any additional variables from config file
+        if ($config.PSObject.Properties) {
+            foreach ($prop in $config.PSObject.Properties) {
+                if (-not $buildVars.ContainsKey($prop.Name)) {
+                    $buildVars[$prop.Name] = $prop.Value
+                }
             }
         }
-    }
 
-    Write-Host "Build variables:"
-    $buildVars.GetEnumerator() | Sort-Object Key | ForEach-Object {
-        Write-Host "  $($_.Key): $($_.Value)"
-    }
-    Write-Host ""
+        Write-Host "Build variables:"
+        $buildVars.GetEnumerator() | Sort-Object Key | ForEach-Object {
+            Write-Host "  $($_.Key): $($_.Value)"
+        }
+        Write-Host ""
 
-    # Build the image
-    Start-TartBuild -TemplatePath $templatePath -Variables $buildVars
+        # Build the image
+        Start-TartBuild -TemplatePath $templatePath -Variables $buildVars
+    }
 
     # Push to registry if requested
-    if ($Push) {
-        Push-TartImage -ImageName $ImageName -Registry $Registry -WorkloadSetVersion $resolvedWorkloadSetVersion
+    if ($Push -or $PushOnly) {
+        Push-TartImage -ImageName $ImageName -Registry $Registry -WorkloadSetVersion $resolvedWorkloadSetVersion -MacOSVersion $MacOSVersion -DotnetChannel $DotnetChannel -BuildSha $BuildSha
     }
 
     Write-Host ""
-    Write-Host "✅ Build completed successfully!"
+    if ($PushOnly) {
+        Write-Host "✅ Push completed successfully!"
+    } else {
+        Write-Host "✅ Build completed successfully!"
+    }
     Write-Host "Image name: $ImageName"
 
-    if ($Push -and $Registry) {
+    if (($Push -or $PushOnly) -and $Registry) {
         Write-Host ""
         Write-Host "Published tags:"
-        Write-Host "  $Registry/${ImageName}:latest"
+        Write-Host "  $Registry/${ImageName}:$MacOSVersion-dotnet$DotnetChannel"
         if ($resolvedWorkloadSetVersion) {
-            Write-Host "  $Registry/${ImageName}:workloads$resolvedWorkloadSetVersion"
+            Write-Host "  $Registry/${ImageName}:$MacOSVersion-dotnet$DotnetChannel-workloads$resolvedWorkloadSetVersion"
+            if ($BuildSha) {
+                Write-Host "  $Registry/${ImageName}:$MacOSVersion-dotnet$DotnetChannel-workloads$resolvedWorkloadSetVersion-v$BuildSha"
+            }
         }
     }
 
@@ -456,9 +521,12 @@ try {
         if ($Registry) {
             Write-Host ""
             Write-Host "To pull from registry:"
-            Write-Host "  tart pull $Registry/${ImageName}:latest"
+            Write-Host "  tart pull $Registry/${ImageName}:$MacOSVersion-dotnet$DotnetChannel"
             if ($resolvedWorkloadSetVersion) {
-                Write-Host "  tart pull $Registry/${ImageName}:workloads$resolvedWorkloadSetVersion"
+                Write-Host "  tart pull $Registry/${ImageName}:$MacOSVersion-dotnet$DotnetChannel-workloads$resolvedWorkloadSetVersion"
+                if ($BuildSha) {
+                    Write-Host "  tart pull $Registry/${ImageName}:$MacOSVersion-dotnet$DotnetChannel-workloads$resolvedWorkloadSetVersion-v$BuildSha"
+                }
             }
         }
     }

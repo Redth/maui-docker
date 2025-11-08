@@ -11,7 +11,7 @@ This repository provides Docker images for .NET MAUI development across three ma
 **Languages**: PowerShell (primary), Dockerfile, YAML  
 **Platforms**: Linux (amd64), Windows (amd64)  
 **Target Runtimes**: .NET 9.0, Docker containers  
-**Published Images**: Docker Hub (`redth/maui-build`, `redth/maui-actions-runner`, `redth/maui-testing`)
+**Published Images**: GitHub Container Registry (`maui-containers/maui-linux`, `maui-containers/maui-windows`, `maui-containers/maui-macos`, `maui-containers/maui-emulator-linux`, `maui-containers/maui-actions-runner-*`, `maui-containers/maui-gitea-runner-*`)
 
 ## Build Instructions - CRITICAL REQUIREMENTS
 
