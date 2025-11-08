@@ -1,4 +1,10 @@
 # maui-containers
+
+[![maui-linux](https://img.shields.io/badge/ghcr.io-maui--linux-blue?logo=docker)](https://github.com/maui-containers/maui-containers/pkgs/container/maui-linux)
+[![maui-windows](https://img.shields.io/badge/ghcr.io-maui--windows-blue?logo=docker)](https://github.com/maui-containers/maui-containers/pkgs/container/maui-windows)
+[![maui-macos](https://img.shields.io/badge/ghcr.io-maui--macos-blue?logo=docker)](https://github.com/maui-containers/maui-containers/pkgs/container/maui-macos)
+[![maui-emulator-linux](https://img.shields.io/badge/ghcr.io-maui--emulator--linux-blue?logo=docker)](https://github.com/maui-containers/maui-containers/pkgs/container/maui-emulator-linux)
+
 Docker images and macOS VMs for MAUI development/building/testing. See the [Repository Guidelines](AGENTS.md) for contributor instructions.
 
 This repository provides comprehensive tooling for .NET MAUI development, organized by container platform type:
