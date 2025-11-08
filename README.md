@@ -20,11 +20,12 @@ maui-containers/
 ## Docker Images (Linux/Windows)
 Located in `docker/` directory:
 
-1. **Platform Images** (`docker/linux/`, `docker/windows/`) - MAUI development environment with optional GitHub/Gitea runner support
-   - Can be used as development containers (no runners)
-   - Can enable GitHub Actions runner via environment variables
-   - Can enable Gitea Actions runner via environment variables
-   - Can run both runners simultaneously
+1. **Development Images** (`docker/linux/`, `docker/windows/`) - Complete MAUI development environment with integrated runner support
+   - Use as standalone development containers (no runner configuration needed)
+   - Enable GitHub Actions runner by setting `GITHUB_TOKEN`, `GITHUB_ORG`, and optionally `GITHUB_REPO`
+   - Enable Gitea Actions runner by setting `GITEA_INSTANCE_URL` and `GITEA_RUNNER_TOKEN`
+   - Run both GitHub and Gitea runners simultaneously on the same container
+   - Runners start automatically when environment variables are present
 2. **Test Images** (`docker/test/`) - Ready-to-use testing environment with Appium and Android Emulator (Linux only)
 
 ## macOS Virtual Machines (Tart)
@@ -130,23 +131,62 @@ maui-containers/maui-emulator-linux:android34-dotnet9.0-workloads9.0.305
 - **Platform-aware** - macOS includes OS version for Xcode; emulator includes API level
 - **No redundant tags** - Removed ambiguous `:latest` and platform-only tags
 
-## Base Images
+## Development Images
 
-Base images provide a complete .NET MAUI development environment without the GitHub Actions runner. These are perfect for general development containers, custom CI/CD setups, or as foundation images for other specialized containers.
+Development images provide a complete .NET MAUI development environment with integrated runner support. Use them as standalone development containers, self-hosted CI/CD runners, or as foundation images for custom containers.
 
 - Linux: `maui-containers/maui-linux`
 - Windows: `maui-containers/maui-windows`
 
-### Usage:
+### Usage Examples:
 
+**As Development Container (No Runners):**
 ```bash
 # Run a Linux development container (.NET 10.0)
 docker run -it maui-containers/maui-linux:dotnet10.0 bash
 
 # Run a Windows development container (.NET 9.0)
 docker run -it maui-containers/maui-windows:dotnet9.0 powershell
+```
 
-# Use as base image with specific workload version
+**As GitHub Actions Self-Hosted Runner:**
+```bash
+# Linux runner
+docker run -d \
+  -e GITHUB_TOKEN=your_token \
+  -e GITHUB_ORG=your-org \
+  -e GITHUB_REPO=your-repo \
+  maui-containers/maui-linux:dotnet10.0
+
+# Windows runner
+docker run -d `
+  -e GITHUB_TOKEN=your_token `
+  -e GITHUB_ORG=your-org `
+  -e GITHUB_REPO=your-repo `
+  maui-containers/maui-windows:dotnet10.0
+```
+
+**As Gitea Actions Runner:**
+```bash
+# Linux runner
+docker run -d \
+  -e GITEA_INSTANCE_URL=https://gitea.example.com \
+  -e GITEA_RUNNER_TOKEN=your_token \
+  maui-containers/maui-linux:dotnet10.0
+```
+
+**Run Both Runners Simultaneously:**
+```bash
+docker run -d \
+  -e GITHUB_TOKEN=your_github_token \
+  -e GITHUB_ORG=your-org \
+  -e GITEA_INSTANCE_URL=https://gitea.example.com \
+  -e GITEA_RUNNER_TOKEN=your_gitea_token \
+  maui-containers/maui-linux:dotnet10.0
+```
+
+**As Base Image for Custom Containers:**
+```dockerfile
 FROM maui-containers/maui-linux:dotnet10.0-workloads10.0.100-rc.2.25024.3
 # Add your custom requirements here
 ```
@@ -156,9 +196,34 @@ FROM maui-containers/maui-linux:dotnet10.0-workloads10.0.100-rc.2.25024.3
 - **Android SDK** with latest tools and API levels
 - **Java/OpenJDK** for Android development
 - **PowerShell** (cross-platform)
+- **GitHub Actions runner** (v2.323.0)
+- **Gitea Actions runner** (act_runner)
 - **Development tools** (Git, build tools, etc.)
 
-See [base/README.md](base/README.md) for detailed documentation.
+### Runner Environment Variables:
+
+**GitHub Actions Runner:**
+- `GITHUB_TOKEN` - GitHub access token with runner permissions (required)
+- `GITHUB_ORG` - GitHub organization name (required)
+- `GITHUB_REPO` - Repository name (optional, defaults to org-level)
+- `RUNNER_NAME` - Custom runner name
+- `RUNNER_NAME_PREFIX` - Prefix for auto-generated runner names
+- `RANDOM_RUNNER_SUFFIX` - Add random suffix to name (default: true)
+- `LABELS` - Custom runner labels
+- `RUNNER_GROUP` - Runner group name
+- `RUNNER_WORKDIR` - Working directory for runner
+
+**Gitea Actions Runner:**
+- `GITEA_INSTANCE_URL` - Gitea instance URL (required)
+- `GITEA_RUNNER_TOKEN` - Runner registration token (required)
+- `GITEA_RUNNER_NAME` - Custom runner name
+- `GITEA_RUNNER_LABELS` - Custom labels (comma-separated)
+
+**General:**
+- `INIT_PWSH_SCRIPT` - PowerShell script to run before starting runners (Linux/Windows)
+- `INIT_BASH_SCRIPT` - Bash script to run before starting runners (Linux only)
+
+See [docker/linux/README.md](docker/linux/README.md) and [docker/windows/README.md](docker/windows/README.md) for detailed documentation.
 
 ### macOS Host Provisioning
 - Run `pwsh ./provisioning/provision.ps1` to mirror the base image tooling directly on a macOS workstation.
@@ -238,109 +303,6 @@ Apple Silicon based Macs will require an M3 or newer to use nested virtualizatio
 Linux should work fine as long as you have [kvm virtualization support](https://docs.docker.com/desktop/setup/install/linux/#kvm-virtualization-support) enabled.
 
 --------------------
-
-## GitHub Action Runner Images
-
-Runner images build upon the base images and add the GitHub Actions runner service. They're designed for self-hosted CI/CD scenarios where you need the full MAUI development stack.
-
-- Linux: ![Docker Image Version (tag)](https://img.shields.io/docker/v/mauicontainers/maui-actions-runner-linux/dotnet10.0?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fmauicontainers%2Fmaui-actions-runner-linux%2Ftags)
-- Windows: ![Docker Image Version (tag)](https://img.shields.io/docker/v/mauicontainers/maui-actions-runner-windows/dotnet10.0?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fmauicontainers%2Fmaui-actions-runner-windows%2Ftags)
-
-These images now derive from the base images, providing better separation of concerns and reduced duplication.
-
-```
-Base Image (MAUI Dev Environment) 
-    ↓
-Runner Image (Base + GitHub Actions Runner)
-```
-
-Runner images are intended to make it really easy to stand up self-hosted build agents with a complete .NET MAUI SDK environment. They have the latest workload set installed for the given .NET SDK version and automatically install, configure (including self registration), and run the GitHub Action Runner service when the container starts.
-
-## Usage:
-
-```pwsh
-docker run `
-    -e GITHUB_ORG=myorg `
-    -e GITHUB_REPO=myrepo `
-    -e GITHUB_TOKEN=myaccesstoken `
-    maui-containers/maui-actions-runner-windows:dotnet9.0
-```
-
-> NOTE: You can omit the `GITHUB_REPO` to install the runner at the organization level, but make sure you have an access token (PAT) with the correct access at this level to do so.
-
-### Environment Variables:
-- `GITHUB_TOKEN` Required github access token with Action Runner Read/Write permissons in order to self register the runner.
-- `GITHUB_ORG` Required github organization to attach the runner to.
-- `GITHUB_REPO` Optional repository name to attach the runner to (otherwise attaches at the org level).
-- `RUNNER_NAME` Optionally sets an explicit runner name.  Default is calculated based on a suffix, and random suffix.
-- `RUNNER_NAME_PREFIX` Optional prefix to be used for the runner name.
-- `RANDOM_RUNNER_SUFFIX` Default is `true`.  If true, adds a random suffix to the RUNNER_NAME.
-- `LABELS` Overrides the default set of labels to apply to the runner.
-- `RUNNER_GROUP` Overrides the default runner group.
-- `RUNNER_WORKDIR` Overrides the default runner work directory.
-- `INIT_PWSH_SCRIPT` Optionally (linux or windows images) specify a path to a .ps1 script file to run before starting the runner agent (Default path is `/config/init.ps1` on linux and `C:\\config\\init.ps1` on windows - you would need to bind a volume for the script to use)
-- `INIT_BASH_SCRIPT` Optionally (linux image only) specify a path to a .ps1 script file to run before starting the runner agent (Default path is `/config/init.sh` on linux - you would need to bind a volume for the script to use)
-
-### Installed Software
-- Chocolatey
-- Microsoft OpenJDK
-- Android SDK
-- .NET SDK
-- .NET Workloads
-
-> NOTE: The .NET Workloads are installed with the latest Workload set version for the given .NET SDK major version (eg: 9.0 SDK could have 9.0.203 as the latest workload set version).
-
-> NOTE: Versions for things like OpenJDK and Android SDK (including the individual SDK packages/components) are inferred from the Workloads' `data/WorkloadDependencies.json` files (in their Manifest nuget packages), which specify recommended versions and components to be installed for each workload.
-
-------------------
-
-## Gitea Runner Images
-
-Runner images build upon the base images and add the Gitea Actions runner service. They're designed for self-hosted CI/CD scenarios with Gitea where you need the full MAUI development stack.
-
-- Linux: ![Docker Image Version (tag)](https://img.shields.io/docker/v/mauicontainers/maui-gitea-runner-linux/dotnet10.0?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fmauicontainers%2Fmaui-gitea-runner-linux%2Ftags)
-- Windows: ![Docker Image Version (tag)](https://img.shields.io/docker/v/mauicontainers/maui-gitea-runner-windows/dotnet10.0?link=https%3A%2F%2Fhub.docker.com%2Fr%2Fmauicontainers%2Fmaui-gitea-runner-windows%2Ftags)
-
-These images derive from the base images and include the Gitea `act_runner` binary for seamless integration with Gitea Actions.
-
-```
-Base Image (MAUI Dev Environment)
-    ↓
-Gitea Runner Image (Base + Gitea act_runner)
-```
-
-Runner images are intended to make it really easy to stand up self-hosted build agents with a complete .NET MAUI SDK environment. They have the latest workload set installed for the given .NET SDK version and automatically install, configure (including self registration), and run the Gitea Actions Runner service when the container starts.
-
-## Usage:
-
-```pwsh
-docker run `
-    -e GITEA_INSTANCE_URL=https://gitea.example.com `
-    -e GITEA_RUNNER_TOKEN=your_runner_token `
-    maui-containers/maui-gitea-runner-linux:dotnet9.0
-```
-
-> NOTE: You can generate a runner registration token from your Gitea instance under Settings → Actions → Runners.
-
-### Environment Variables:
-- `GITEA_INSTANCE_URL` Required Gitea instance URL (e.g., https://gitea.example.com).
-- `GITEA_RUNNER_TOKEN` Required runner registration token from Gitea instance.
-- `GITEA_RUNNER_NAME` Optionally sets an explicit runner name. Default is `maui-runner-{random}`.
-- `GITEA_RUNNER_LABELS` Optional comma-separated labels (default: `ubuntu-latest,maui,dotnet`).
-- `INIT_PWSH_SCRIPT` Optionally (linux or windows images) specify a path to a .ps1 script file to run before starting the runner agent (Default path is `/config/init.ps1` on linux and `C:\\config\\init.ps1` on windows - you would need to bind a volume for the script to use)
-- `INIT_BASH_SCRIPT` Optionally (linux image only) specify a path to a .sh script file to run before starting the runner agent (Default path is `/config/init.sh` on linux - you would need to bind a volume for the script to use)
-
-### Installed Software
-- Chocolatey (Windows)
-- Microsoft OpenJDK
-- Android SDK
-- .NET SDK
-- .NET Workloads
-- Gitea act_runner
-
-See [gitea-runner/README.md](gitea-runner/README.md) for detailed documentation.
-
-------------------
 
 ## Tart VM Images (macOS)
 
