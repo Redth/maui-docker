@@ -12,9 +12,9 @@ Param(
     [String]$AppiumVersion="",
     [String]$AppiumUIAutomator2DriverVersion="",
     [String]$BuildSha="",
-    [Bool]$Load=$true,
-    [Bool]$Push=$false,
-    [bool]$UseBuildx=$true) 
+    [switch]$Load,
+    [switch]$Push,
+    [switch]$UseBuildx) 
 
 if ($DockerPlatform.StartsWith('linux/')) {
     $dockerTagBase = "appium-emulator-linux"

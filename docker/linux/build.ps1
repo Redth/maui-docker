@@ -2,8 +2,8 @@ Param([String]$DotnetVersion="9.0",
     [String]$WorkloadSetVersion="",
     [String]$DockerRepository="ghcr.io/maui-containers",
     [String]$Version="latest",
-    [Bool]$Load=$false,
-    [Bool]$Push=$false) 
+    [switch]$Load,
+    [switch]$Push) 
 
 # Use a more reliable method to import the common functions module
 # This handles paths with spaces better and is more explicit

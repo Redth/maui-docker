@@ -4,8 +4,8 @@ Param([String]$DotnetVersion="9.0",
     [String]$DockerPlatform="linux/amd64",
     [String]$Version="latest",
     [String]$BuildSha="",
-    [Bool]$Load=$false,
-    [Bool]$Push=$false)
+    [switch]$Load,
+    [switch]$Push)
 
 if ($DockerPlatform.StartsWith('linux/')) {
     $dockerTagBase = "linux"

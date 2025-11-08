@@ -38,12 +38,12 @@ pwsh -Command ". ./common-functions.ps1; Find-LatestWorkloadSet -DotnetVersion '
 
 **Build Docker Images (Linux - Works in Docker environments):**
 ```bash
-pwsh ./docker/build.ps1 -DotnetVersion "9.0" -DockerPlatform "linux/amd64" -DockerRepository "test/maui-build" -Load:$true
+pwsh ./docker/build.ps1 -DotnetVersion "9.0" -DockerPlatform "linux/amd64" -DockerRepository "test/maui-build" -Load
 ```
 
 **Build Test Images (Requires Docker base image first):**
 ```bash
-pwsh ./docker/test/build.ps1 -AndroidSdkApiLevel 35 -DockerRepository "test/maui-testing" -Load:$true
+pwsh ./docker/test/build.ps1 -AndroidSdkApiLevel 35 -DockerRepository "test/maui-testing" -Load
 ```
 
 ### Build Sequence - MUST Follow Order
@@ -53,9 +53,10 @@ pwsh ./docker/test/build.ps1 -AndroidSdkApiLevel 35 -DockerRepository "test/maui
 
 ### Common Build Failures & Solutions
 
-**PowerShell Boolean Parameters:**
-- Use `-Load:$true` or `-Push:$false` syntax for boolean parameters
-- Incorrect: `-Load $true` - Correct: `-Load:$true`
+**PowerShell Switch Parameters:**
+- Boolean parameters are defined as `[switch]` and work as simple flags
+- Use `-Load` to enable, omit the parameter to disable
+- Example: `pwsh ./docker/build.ps1 -Load` (not `-Load:$true`)
 
 **Network Dependencies:**
 - Workload detection requires internet access to NuGet and npm APIs
@@ -156,7 +157,7 @@ Test Image (Base + Appium/Emulator)
 
 **After Making Changes:**  
 1. **ALWAYS test build scripts locally** before committing
-2. For Dockerfile changes: Build locally with `-Load $true`
+2. For Dockerfile changes: Build locally with `-Load`
 3. For PowerShell changes: Test functions individually
 4. For workflow changes: Use workflow_dispatch to test
 
