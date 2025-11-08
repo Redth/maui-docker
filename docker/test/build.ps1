@@ -66,73 +66,59 @@ if ([string]::IsNullOrEmpty($AppiumVersion) -or [string]::IsNullOrEmpty($AppiumU
     Write-Host "  UIAutomator2 Driver: $AppiumUIAutomator2DriverVersion"
 }
 
-# Hardcoded Android SDK component versions
-# These values work across API levels 23-35 and don't require .NET workload detection
+# Default Android SDK component versions (will be overridden by workload detection)
+# These values are used as fallbacks if workload detection fails
 $androidBuildToolsVersion = "35.0.0"
 $androidCmdLineToolsVersion = "13.0"
 $androidJdkMajorVersion = "17"
 $androidAvdSystemImageType = "google_apis"
 $androidAvdDeviceType = "Nexus 5X"
 
-Write-Host "Android SDK configuration:"
-Write-Host "  API Level: $AndroidSdkApiLevel (from parameter - this is what the emulator will use)"
-Write-Host "  Build Tools Version: $androidBuildToolsVersion"
-Write-Host "  Command Line Tools Version: $androidCmdLineToolsVersion"
-Write-Host "  JDK Major Version: $androidJdkMajorVersion"
-Write-Host "  System Image Type: $androidAvdSystemImageType"
-Write-Host "  AVD Device Type: $androidAvdDeviceType"
+# Get comprehensive workload information with a single call
+Write-Host "Getting workload information for Android SDK dependencies..."
+$workloadInfo = Get-WorkloadInfo -DotnetVersion $DotnetVersion -WorkloadSetVersion $WorkloadSetVersion -IncludeAndroid -DockerPlatform $DockerPlatform
 
-# For Docker tags, use a simplified workload version string since we don't detect workloads
-$dotnetCommandWorkloadSetVersion = if ($WorkloadSetVersion) { $WorkloadSetVersion } else { "$DotnetVersion.0" }
+if (-not $workloadInfo) {
+    Write-Error "Failed to get workload information."
+    exit 1
+}
 
-# NOTE: Commented out workload-based Android SDK component detection
-# Uncomment below if you need to restore workload-based version detection.
-#
-# # Get comprehensive workload information with a single call
-# Write-Host "Getting workload information for Android SDK dependencies..."
-# $workloadInfo = Get-WorkloadInfo -DotnetVersion $DotnetVersion -WorkloadSetVersion $WorkloadSetVersion -IncludeAndroid -DockerPlatform $DockerPlatform
-#
-# if (-not $workloadInfo) {
-#     Write-Error "Failed to get workload information."
-#     exit 1
-# }
-#
-# # Extract Android-specific information
-# $androidWorkload = $workloadInfo.Workloads["Microsoft.NET.Sdk.Android"]
-# if (-not $androidWorkload) {
-#     Write-Error "Could not find Android workload in the workload set."
-#     exit 1
-# }
-#
-# # Extract Android details if available
-# $androidDetails = $androidWorkload.Details
-# if (-not $androidDetails) {
-#     Write-Error "Could not extract Android details from workload."
-#     exit 1
-# }
-#
-# Write-Host "Android workload details retrieved successfully:"
-# Write-Host "  API Level: $($androidDetails.ApiLevel)"
-# Write-Host "  Build Tools Version: $($androidDetails.BuildToolsVersion)"
-# Write-Host "  Command Line Tools Version: $($androidDetails.CmdLineToolsVersion)"
-# Write-Host "  JDK Major Version: $($androidDetails.JdkMajorVersion)"
-# Write-Host "  System Image Type: $($androidDetails.SystemImageType)"
-# Write-Host "  AVD Device Type: $($androidDetails.AvdDeviceType)"
-#
-# # Use workload-detected values for Android SDK components
-# $androidBuildToolsVersion = $androidDetails.BuildToolsVersion
-# $androidCmdLineToolsVersion = $androidDetails.CmdLineToolsVersion
-# $androidJdkMajorVersion = $androidDetails.JdkMajorVersion
-# $androidAvdSystemImageType = $androidDetails.SystemImageType
-# $androidAvdDeviceType = $androidDetails.AvdDeviceType
-#
-# # Extract the dotnet command version for Docker tags
-# $dotnetCommandWorkloadSetVersion = $workloadInfo.DotnetCommandWorkloadSetVersion
-#
-# # Determine which Android SDK API level to use
-# # Use the parameter provided, which could be from the matrix or a specific override
-# Write-Host "Using Android SDK API Level: $AndroidSdkApiLevel (from parameter/matrix)"
-# Write-Host "Workload default API Level: $($androidDetails.ApiLevel) (will be available in the built image)"
+# Extract Android-specific information
+$androidWorkload = $workloadInfo.Workloads["Microsoft.NET.Sdk.Android"]
+if (-not $androidWorkload) {
+    Write-Error "Could not find Android workload in the workload set."
+    exit 1
+}
+
+# Extract Android details if available
+$androidDetails = $androidWorkload.Details
+if (-not $androidDetails) {
+    Write-Error "Could not extract Android details from workload."
+    exit 1
+}
+
+Write-Host "Android workload details retrieved successfully:"
+Write-Host "  API Level: $($androidDetails.ApiLevel)"
+Write-Host "  Build Tools Version: $($androidDetails.BuildToolsVersion)"
+Write-Host "  Command Line Tools Version: $($androidDetails.CmdLineToolsVersion)"
+Write-Host "  JDK Major Version: $($androidDetails.JdkMajorVersion)"
+Write-Host "  System Image Type: $($androidDetails.SystemImageType)"
+Write-Host "  AVD Device Type: $($androidDetails.AvdDeviceType)"
+
+# Use workload-detected values for Android SDK components (override hardcoded values)
+$androidBuildToolsVersion = $androidDetails.BuildToolsVersion
+$androidCmdLineToolsVersion = $androidDetails.CmdLineToolsVersion
+$androidJdkMajorVersion = $androidDetails.JdkMajorVersion
+$androidAvdSystemImageType = $androidDetails.SystemImageType
+$androidAvdDeviceType = $androidDetails.AvdDeviceType
+
+# Extract the dotnet command version for Docker tags
+$dotnetCommandWorkloadSetVersion = $workloadInfo.DotnetCommandWorkloadSetVersion
+
+# Determine which Android SDK API level to use
+# Use the parameter provided, which could be from the matrix or a specific override
+Write-Host "Using Android SDK API Level: $AndroidSdkApiLevel (from parameter/matrix)"
+Write-Host "Workload default API Level: $($androidDetails.ApiLevel) (will be available in the built image)"
 
 # Build tags following the unified naming scheme:
 # - android{XX}-dotnet{X.Y} - Latest workload for this .NET version
