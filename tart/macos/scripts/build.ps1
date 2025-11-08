@@ -182,21 +182,10 @@ if ($MacOSVersion -and $DotnetChannel) {
 
 # Set default image name if not provided
 if (-not $ImageName) {
-    # When pushing to registry, use standardized image name (maui-macos)
-    # When building locally, include version info in the name for easy identification
-    if ($Registry) {
-        $ImageName = switch ($ImageType) {
-            "maui" { "maui-macos" }
-            "ci" { "maui-ci-macos" }
-        }
-    } else {
-        # Local builds include version in name for easy identification
-        $dotnetSuffix = if ($DotnetChannel) { "-dotnet$($DotnetChannel)" } else { "" }
-        $suffix = "-$MacOSVersion$dotnetSuffix"
-        $ImageName = switch ($ImageType) {
-            "maui" { "maui-dev$suffix" }
-            "ci" { "maui-ci$suffix" }
-        }
+    # Always use standardized image name for consistency
+    $ImageName = switch ($ImageType) {
+        "maui" { "maui-macos" }
+        "ci" { "maui-ci-macos" }
     }
 }
 
