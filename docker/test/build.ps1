@@ -26,13 +26,13 @@ if ($DockerPlatform.StartsWith('linux/')) {
 
 # Import common functions for Appium version detection
 # NOTE: We only use this for Get-LatestAppiumVersions, not for workload detection
-$commonFunctionsPath = Join-Path -Path $PSScriptRoot -ChildPath "..\common-functions.ps1" -Resolve -ErrorAction SilentlyContinue
+$commonFunctionsPath = Join-Path -Path $PSScriptRoot -ChildPath "..\..\common-functions.ps1" -Resolve -ErrorAction SilentlyContinue
 
 if ($commonFunctionsPath -and (Test-Path -Path $commonFunctionsPath -PathType Leaf)) {
     . $commonFunctionsPath
     Write-Host "Imported common functions from $commonFunctionsPath"
 } else {
-    Write-Error "Could not find common functions file at expected path: ..\common-functions.ps1"
+    Write-Error "Could not find common functions file at expected path: ..\..\common-functions.ps1"
     exit 1
 }
 
