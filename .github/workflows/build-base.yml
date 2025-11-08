@@ -10,6 +10,10 @@ on:
   repository_dispatch:
     types: [trigger-base-build]
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build-linux:
     name: 🐋 Build Linux (.NET ${{ matrix.DOTNET_VERSION }})

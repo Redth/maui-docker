@@ -28,6 +28,10 @@ on:
   repository_dispatch:
     types: [trigger-test-build]
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   get-workload-info:
     name: 🔍 Get Workload Information
