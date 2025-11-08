@@ -30,9 +30,9 @@ All images support both GitHub Actions and Gitea Actions runners through conditi
 ./docker/windows/build.ps1 -DotnetVersion "9.0" -DockerRepository "your-repo/maui-build" -Version "latest"
 ```
 
-### Building Test Images
+### Building Emulator Images
 ```powershell
-# Build test images with specific Android API level
+# Build emulator images with specific Android API level
 ./docker/test/build.ps1 -DotnetVersion "9.0" -AndroidSdkApiLevel 35 -DockerRepository "your-repo/maui-testing"
 ./docker/test/build.ps1 -DotnetVersion "10.0" -AndroidSdkApiLevel 35 -DockerRepository "your-repo/maui-testing"
 
@@ -97,11 +97,11 @@ The build system:
 
 ### GitHub Actions Integration
 Comprehensive CI/CD workflows in `.github/workflows/`:
-- `build-all.yml` - Builds all image types with matrix strategy
-- `build-base.yml` - Builds Docker base images
-- `build-test.yml` - Builds test images for multiple API levels
+- `check-workload-updates.yml` - Monitors for workload updates and triggers builds
+- `build-docker.yml` - Builds Docker images (Linux + Windows with integrated runners)
+- `build-emulators.yml` - Builds Android emulator images for multiple API levels
 - `build-tart-vms.yml` - Builds macOS Tart VM images
-- `check-workload-updates.yml` - Monitors for workload updates
+- `pr-validation.yml` - Validates PRs with test builds
 
 ## Common Parameters
 

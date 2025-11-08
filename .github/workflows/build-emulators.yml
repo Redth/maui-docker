@@ -1,4 +1,4 @@
-name: 🐋 Build All Docker Images
+name: 🐋 Build Android Emulator Images
 
 on:
   workflow_dispatch:
@@ -11,17 +11,12 @@ on:
         description: 'JSON array of .NET versions to build (e.g., ["9.0", "10.0"])'
         required: false
         type: string
-        default: '["9.0", "10.0"]'
+        default: '["9.0"]'
       android_api_levels:
         description: 'JSON array of Android API levels to build (e.g., [34, 35])'
         required: false
         type: string
-        default: '[23, 24, 25, 26, 28, 29, 30, 31, 32, 33, 34, 35, 36]'
-      force_build:
-        description: 'Force building and pushing of all images regardless of existing tags'
-        required: false
-        default: false
-        type: boolean
+        default: '[23, 24, 25, 26, 28, 29, 30, 31, 32, 33, 34, 35]'
       appium_version:
         description: 'Specific Appium version to use (defaults to latest from npm)'
         required: false
@@ -31,110 +26,13 @@ on:
         required: false
         type: string
   repository_dispatch:
-    types: [trigger-build-all]
+    types: [trigger-emulators-build]
 
 permissions:
   contents: read
   packages: write
 
 jobs:
-  # Build Base Images (Linux and Windows) - now includes runner functionality
-  build-linux:
-    name: 🐋 Build Linux (.NET ${{ matrix.DOTNET_VERSION }})
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        DOTNET_VERSION: [ "9.0", "10.0" ]
-    
-    steps:
-    - name: 🛒 Checkout
-      uses: actions/checkout@v4
-
-    - name: 🔧 Set Variables
-      id: vars
-      run: |
-        # Determine workload set version from either workflow_dispatch input or repository_dispatch payload
-        if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
-          WORKLOAD_SET_VERSION="${{ github.event.client_payload.workload_set_version }}"
-        else
-          WORKLOAD_SET_VERSION="${{ inputs.workload_set_version }}"
-        fi
-        echo "workload_set_version=$WORKLOAD_SET_VERSION" >> $GITHUB_OUTPUT
-        echo "Using workload set version: $WORKLOAD_SET_VERSION"
-
-    - name: 🐋 Login to GitHub Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: 🔧 Build Docker Image
-      shell: pwsh
-      run: |
-        $buildArgs = @{
-          DotNetVersion     = "${{ matrix.DOTNET_VERSION }}"
-          DockerPlatform    = "linux/amd64"
-          Version           = "latest"
-          Push              = $true
-        }
-
-        # Add workload set version if specified
-        if ("${{ steps.vars.outputs.workload_set_version }}" -ne "") {
-          $buildArgs.WorkloadSetVersion = "${{ steps.vars.outputs.workload_set_version }}"
-        }
-
-        ./docker/build.ps1 @buildArgs
-
-  build-windows:
-    name: 🐋 Build Windows (.NET ${{ matrix.DOTNET_VERSION }})
-    runs-on: windows-latest
-    strategy:
-      matrix:
-        DOTNET_VERSION: [ "9.0", "10.0" ]
-    
-    steps:
-    - name: 🛒 Checkout
-      uses: actions/checkout@v4
-
-    - name: 🔧 Set Variables
-      id: vars
-      shell: bash
-      run: |
-        # Determine workload set version from either workflow_dispatch input or repository_dispatch payload
-        if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
-          WORKLOAD_SET_VERSION="${{ github.event.client_payload.workload_set_version }}"
-        else
-          WORKLOAD_SET_VERSION="${{ inputs.workload_set_version }}"
-        fi
-        echo "workload_set_version=$WORKLOAD_SET_VERSION" >> $GITHUB_OUTPUT
-        echo "Using workload set version: $WORKLOAD_SET_VERSION"
-
-    - name: 🐋 Login to GitHub Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: 🔧 Build Docker Image
-      shell: pwsh
-      run: |
-        $buildArgs = @{
-          DotNetVersion     = "${{ matrix.DOTNET_VERSION }}"
-          DockerPlatform    = "windows/amd64"
-          Version           = "latest"
-          Push              = $true
-        }
-
-        # Add workload set version if specified
-        if ("${{ steps.vars.outputs.workload_set_version }}" -ne "") {
-          $buildArgs.WorkloadSetVersion = "${{ steps.vars.outputs.workload_set_version }}"
-        }
-
-        ./docker/build.ps1 @buildArgs
-
-  # Get workload info for test builds
   get-workload-info:
     name: 🔍 Get Workload Information
     runs-on: ubuntu-latest
@@ -247,15 +145,24 @@ jobs:
         Write-Host "Matrix: $matrixJson"
         echo "matrix=$matrixJson" >> $env:GITHUB_OUTPUT
 
-  # Step 5: Build Test Images (independent of Docker images)
-  build-test-linux:
-    name: 🐋 Android ${{ matrix.android_api_level }} Emulator (.NET ${{ matrix.dotnet_version }})
+  determine-matrix:
     runs-on: ubuntu-latest
     needs: get-workload-info
+    outputs:
+      matrix: ${{ needs.get-workload-info.outputs.matrix }}
+    steps:
+      - name: 📋 Pass Through Matrix
+        run: |
+          echo "Using matrix: ${{ needs.get-workload-info.outputs.matrix }}"
+
+  build:
+    needs: [get-workload-info, determine-matrix]
+    name: 🐋 Android ${{ matrix.android_api_level }} Emulator (.NET ${{ matrix.dotnet_version }})
+    runs-on: ubuntu-latest
+
     strategy:
-      matrix: ${{ fromJson(needs.get-workload-info.outputs.matrix) }}
-      fail-fast: false
-    
+      matrix: ${{ fromJson(needs.determine-matrix.outputs.matrix) }}
+
     steps:
     - name: 🛒 Checkout
       uses: actions/checkout@v4
@@ -267,20 +174,28 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: 🔧 Build Android ${{ matrix.android_api_level }} Emulator
+    - name: 🔨 Build Android ${{ matrix.android_api_level }} Emulator
       shell: pwsh
+      working-directory: ./docker/test/
       run: |
+        # Build arguments
         $buildArgs = @{
-          DotnetVersion = "${{ matrix.dotnet_version }}"
-          DockerPlatform = "linux/amd64"
-          AndroidSdkApiLevel = "${{ matrix.android_api_level }}"
-          Push = $true
+          AndroidSdkApiLevel  = "${{ matrix.android_api_level }}"
+          Version             = "${{ github.run_id }}"
+          Load                = $true
+        }
+
+        if ("${{ github.ref }}" -eq "refs/heads/main") {
+          $buildArgs.Push = $true
         }
 
         # Add workload set version if specified
         if ("${{ needs.get-workload-info.outputs.workload-set-version }}" -ne "") {
           $buildArgs.WorkloadSetVersion = "${{ needs.get-workload-info.outputs.workload-set-version }}"
         }
+
+        # Add .NET version from matrix
+        $buildArgs.DotnetVersion = "${{ matrix.dotnet_version }}"
 
         # Add Appium versions if specified
         if ("${{ inputs.appium_version }}" -ne "") {
@@ -291,50 +206,6 @@ jobs:
           $buildArgs.AppiumUIAutomator2DriverVersion = "${{ inputs.appium_uiautomator2_driver_version }}"
         }
 
-        ./docker/test/build.ps1 @buildArgs
+        ./build.ps1 @buildArgs
 
-  # Summary
-  build-summary:
-    name: 📋 Build Summary
-    runs-on: ubuntu-latest
-    needs: [build-linux, build-windows, build-test-linux]
-    if: always()
-    
-    steps:
-    - name: 📋 Generate Summary
-      run: |
-        echo "## Build Results Summary" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### Docker Images (includes GitHub/Gitea runner support)" >> $GITHUB_STEP_SUMMARY
-        echo "- **Linux:** ${{ needs.build-linux.result }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Windows:** ${{ needs.build-windows.result }}" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### Test Images" >> $GITHUB_STEP_SUMMARY
-        echo "- **Linux Test:** ${{ needs.build-test-linux.result }}" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
 
-        # Count successful builds
-        total_builds=3
-        successful_builds=0
-
-        if [ "${{ needs.build-linux.result }}" == "success" ]; then
-          successful_builds=$((successful_builds + 1))
-        fi
-        if [ "${{ needs.build-windows.result }}" == "success" ]; then
-          successful_builds=$((successful_builds + 1))
-        fi
-        if [ "${{ needs.build-test-linux.result }}" == "success" ]; then
-          successful_builds=$((successful_builds + 1))
-        fi
-        
-        echo "**Overall Status:** $successful_builds/$total_builds builds successful" >> $GITHUB_STEP_SUMMARY
-        
-        if [ $successful_builds -eq $total_builds ]; then
-          echo "✅ All builds completed successfully!" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "⚠️ Some builds failed. Please check the individual job logs." >> $GITHUB_STEP_SUMMARY
-        fi
-        
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "**Note:** Base images now include GitHub Actions and Gitea Actions runner support." >> $GITHUB_STEP_SUMMARY
-        echo "Enable runners by setting environment variables at runtime." >> $GITHUB_STEP_SUMMARY

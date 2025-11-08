@@ -8,7 +8,7 @@ on:
         required: false
         type: string
   repository_dispatch:
-    types: [trigger-base-build]
+    types: [trigger-docker-build]
 
 permissions:
   contents: read

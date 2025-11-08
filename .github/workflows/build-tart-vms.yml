@@ -1,4 +1,4 @@
-name: 🍎 Build Tart VM Images
+name: 🍎 Build Tart macOS VM Images
 
 on:
   workflow_dispatch:

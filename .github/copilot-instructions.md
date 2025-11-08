@@ -41,13 +41,13 @@ pwsh -Command ". ./common-functions.ps1; Find-LatestWorkloadSet -DotnetVersion '
 pwsh ./docker/build.ps1 -DotnetVersion "9.0" -DockerPlatform "linux/amd64" -DockerRepository "test/maui-build" -Load
 ```
 
-**Build Test Images (Requires Docker base image first):**
+**Build Emulator Images:**
 ```bash
 pwsh ./docker/test/build.ps1 -AndroidSdkApiLevel 35 -DockerRepository "test/maui-testing" -Load
 ```
 
-### Build Sequence - MUST Follow Order
-1. **Docker base images** must be built before test images
+### Build Sequence
+1. **Docker images** and **emulator images** are independent and can be built in any order
 2. **Windows builds** require Windows runners in CI
 3. **Test images** are Linux-only and require `/dev/kvm` device for emulator
 
@@ -123,17 +123,17 @@ Test Image (Base + Appium/Emulator)
 ### GitHub Workflows - Validation Pipeline
 
 **Primary Workflows:**
-- `build-all.yml` - Comprehensive build of all image types
-- `build-base.yml` - Docker base images only  
-- `build-test.yml` - Test images only
+- `check-workload-updates.yml` - Automated version monitoring and build triggering
+- `build-docker.yml` - Docker images (Linux + Windows with integrated runners)
+- `build-emulators.yml` - Android emulator images (with Appium)
 - `build-tart-vms.yml` - macOS Tart VM images
-- `check-workload-updates.yml` - Automated version monitoring
+- `pr-validation.yml` - PR validation builds
 
 **Critical Workflow Features:**
 - Matrix builds across .NET versions and Android API levels
 - Automatic workload version detection
 - Multi-platform support (Linux/Windows/macOS)
-- Dependency ordering (Docker base → test)
+- Independent parallel builds (base and test images build separately)
 
 ### Key Source Files
 
