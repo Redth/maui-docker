@@ -81,7 +81,10 @@ else
   RANDOM_RUNNER_SUFFIX=${RANDOM_RUNNER_SUFFIX:-"true"}
 
   if [[ "${RANDOM_RUNNER_SUFFIX}" == "true" ]]; then
+    # Temporarily disable pipefail to avoid SIGPIPE from head terminating tr
+    set +o pipefail
     RAND_SUFFIX=$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 13)
+    set -o pipefail
     RUNNER_NAME_VALUE="${NAME_PREFIX}-${RAND_SUFFIX}"
   else
     if [[ -s /etc/hostname ]]; then
