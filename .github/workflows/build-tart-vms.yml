@@ -91,6 +91,12 @@ jobs:
         # Packer uses this to authenticate GitHub API requests for plugin downloads
         PACKER_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
+        Write-Host "=== Build Configuration ==="
+        Write-Host ".NET Channel: ${{ env.DOTNET_CHANNEL }}"
+        Write-Host "Image Type: ${{ env.IMAGE_TYPE }}"
+        Write-Host "Workload Set Version: ${{ env.WORKLOAD_SET_VERSION }}"
+        Write-Host ""
+
         $buildArgs = @{
           ImageType     = "${{ env.IMAGE_TYPE }}"
           DotnetChannel = "${{ env.DOTNET_CHANNEL }}"
@@ -134,10 +140,12 @@ jobs:
           Write-Host "Build only - not pushing to registry"
         }
 
-        Write-Host "Building Tart VM with parameters:"
+        Write-Host ""
+        Write-Host "=== Build Parameters ==="
         $buildArgs.GetEnumerator() | ForEach-Object {
           Write-Host "  $($_.Key): $($_.Value)"
         }
+        Write-Host ""
 
         cd tart/macos/scripts
         ./build.ps1 @buildArgs
@@ -187,6 +195,43 @@ jobs:
         Write-Host ""
         Write-Host "To run with Gitea Actions runner:"
         Write-Host "  GITEA_INSTANCE_URL=https://gitea.example.com GITEA_RUNNER_TOKEN=xxx tart run $imageName"
+
+    - name: 🧹 Cleanup Local Images
+      if: always()
+      shell: pwsh
+      run: |
+        Write-Host "Cleaning up local Tart images to free disk space..."
+
+        Write-Host "Images before cleanup:"
+        tart list
+
+        # Get the expected image name based on platform matrix
+        $matrixFile = "tart/macos/config/platform-matrix.json"
+        if (Test-Path $matrixFile) {
+          $matrix = Get-Content $matrixFile -Raw | ConvertFrom-Json
+          $channelInfo = $matrix.DotnetChannels."${{ env.DOTNET_CHANNEL }}"
+          if ($channelInfo -and $channelInfo.MacOSVersion) {
+            $macosVersion = $channelInfo.MacOSVersion
+            $imageName = "maui-$macosVersion"
+
+            Write-Host "Removing local image: $imageName"
+            tart delete $imageName 2>&1 | Out-Null || Write-Host "  (image not found, skipping)"
+          }
+        }
+
+        # Also try the generic name
+        Write-Host "Removing local image: maui-macos"
+        tart delete maui-macos 2>&1 | Out-Null || Write-Host "  (image not found, skipping)"
+
+        Write-Host ""
+        Write-Host "Images after cleanup:"
+        tart list
+
+        Write-Host ""
+        Write-Host "Disk space after cleanup:"
+        df -h
+
+        Write-Host "Cleanup complete"
 
   build-summary:
     name: 📋 Build Summary

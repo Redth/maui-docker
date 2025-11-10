@@ -41,19 +41,44 @@ fi
 
 log "Bootstrap initialization complete"
 
-# Manually load runner LaunchAgents so they inherit the environment variables we just set
-# These agents should NOT have RunAtLoad=true - they're loaded on-demand by bootstrap
+# Manually bootstrap runner LaunchAgents so they start in user context
+# These agents should NOT have RunAtLoad=true - they're bootstrapped on-demand by this script
 GITHUB_RUNNER_PLIST="${HOME}/Library/LaunchAgents/com.github.actions.runner.plist"
 GITEA_RUNNER_PLIST="${HOME}/Library/LaunchAgents/com.gitea.actions.runner.plist"
 
+# Get the user's UID for domain specification
+USER_UID=$(id -u)
+
 if [[ -f "${GITHUB_RUNNER_PLIST}" ]]; then
-  log "Loading GitHub Actions runner LaunchAgent"
-  launchctl load "${GITHUB_RUNNER_PLIST}" 2>/dev/null || log "GitHub runner LaunchAgent already loaded or failed to load"
+  log "Bootstrapping GitHub Actions runner LaunchAgent"
+  # Use bootstrap instead of deprecated load command
+  # Bootstrap into user domain (gui/UID) to ensure it runs in user context
+  if launchctl bootstrap "gui/${USER_UID}" "${GITHUB_RUNNER_PLIST}" 2>/dev/null; then
+    log "GitHub runner LaunchAgent bootstrapped successfully"
+  else
+    # Agent might already be bootstrapped, try to kickstart it
+    if launchctl kickstart -k "gui/${USER_UID}/com.github.actions.runner" 2>/dev/null; then
+      log "GitHub runner LaunchAgent was already bootstrapped, restarted it"
+    else
+      log "GitHub runner LaunchAgent already running or configuration missing"
+    fi
+  fi
 fi
 
 if [[ -f "${GITEA_RUNNER_PLIST}" ]]; then
-  log "Loading Gitea Actions runner LaunchAgent"
-  launchctl load "${GITEA_RUNNER_PLIST}" 2>/dev/null || log "Gitea runner LaunchAgent already loaded or failed to load"
+  log "Bootstrapping Gitea Actions runner LaunchAgent"
+  # Use bootstrap instead of deprecated load command
+  # Bootstrap into user domain (gui/UID) to ensure it runs in user context
+  if launchctl bootstrap "gui/${USER_UID}" "${GITEA_RUNNER_PLIST}" 2>/dev/null; then
+    log "Gitea runner LaunchAgent bootstrapped successfully"
+  else
+    # Agent might already be bootstrapped, try to kickstart it
+    if launchctl kickstart -k "gui/${USER_UID}/com.gitea.actions.runner" 2>/dev/null; then
+      log "Gitea runner LaunchAgent was already bootstrapped, restarted it"
+    else
+      log "Gitea runner LaunchAgent already running or configuration missing"
+    fi
+  fi
 fi
 
 log "Runners started (if configured)"
