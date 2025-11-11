@@ -58,6 +58,9 @@ RUN Set-ExecutionPolicy Bypass -Scope Process -Force; \
     iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1')); \
     choco install git -y;
 
+# Install Node.js and npm
+RUN choco install nodejs-lts -y
+
 # Install openjdk
 RUN choco install microsoft-openjdk$($env:JDK_MAJOR_VERSION) -y
 

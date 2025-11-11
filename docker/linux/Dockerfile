@@ -76,6 +76,13 @@ RUN apt-get update && apt-get install -y \
     && apt clean all \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Node.js and npm
+RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
+    && apt-get install -y nodejs \
+    && apt autoremove -y \
+    && apt clean all \
+    && rm -rf /var/lib/apt/lists/*
+
 # Create mauiusr to run things under
 ARG USER_PASS=secret
 RUN groupadd mauiusr \
