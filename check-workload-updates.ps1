@@ -104,6 +104,56 @@ function Write-HostWithPrefix {
     Write-Host "🔍 $Message"
 }
 
+# Function to get tags from a container registry (Docker Hub or GHCR)
+function Get-RegistryTags {
+    param(
+        [string]$Repository
+    )
+
+    # Check if this is a GHCR repository
+    if ($Repository -match '^ghcr\.io/([^/]+)/(.+)$') {
+        $owner = $Matches[1]
+        $packageName = $Matches[2]
+
+        # Use GitHub API for GHCR
+        $ghcrUri = "https://api.github.com/orgs/$owner/packages/container/$packageName/versions?per_page=100"
+        Write-HostWithPrefix "Querying GitHub Container Registry API: $ghcrUri"
+
+        $headers = @{
+            Accept = "application/vnd.github+json"
+            "X-GitHub-Api-Version" = "2022-11-28"
+        }
+
+        # Add auth token if available
+        if ($env:GITHUB_TOKEN) {
+            $headers["Authorization"] = "Bearer $env:GITHUB_TOKEN"
+        }
+
+        $response = Invoke-RestMethod -Uri $ghcrUri -Headers $headers -TimeoutSec 30
+
+        # Extract all tags from the response - each version can have multiple tags
+        $tags = @()
+        foreach ($version in $response) {
+            if ($version.metadata -and $version.metadata.container -and $version.metadata.container.tags) {
+                $tags += $version.metadata.container.tags
+            }
+        }
+
+        # Remove duplicates and return
+        return $tags | Sort-Object -Unique
+
+    } else {
+        # Use Docker Hub API for non-GHCR repositories
+        $dockerHubUri = "https://registry.hub.docker.com/v2/repositories/$Repository/tags?page_size=100"
+        Write-HostWithPrefix "Querying Docker Hub API: $dockerHubUri"
+
+        $response = Invoke-RestMethod -Uri $dockerHubUri -TimeoutSec 30
+        $tags = $response.results | ForEach-Object { $_.name }
+
+        return $tags
+    }
+}
+
 # Function to check for existing test builds with Android API levels
 function Test-TestRepositoryBuilds {
     param(
@@ -114,15 +164,11 @@ function Test-TestRepositoryBuilds {
     )
     
     Write-HostWithPrefix "Checking test repository: $Repository"
-    
+
     try {
-        # Get tags from Docker Hub API for test repository
-        $dockerHubUri = "https://registry.hub.docker.com/v2/repositories/$Repository/tags?page_size=100"
-        Write-HostWithPrefix "Querying Docker Hub API for test repo: $dockerHubUri"
-        
-        $tagsResponse = Invoke-RestMethod -Uri $dockerHubUri -TimeoutSec 30
-        $existingTags = $tagsResponse.results | ForEach-Object { $_.name }
-        
+        # Get tags from registry
+        $existingTags = Get-RegistryTags -Repository $Repository
+
         Write-HostWithPrefix "Found $($existingTags.Count) test repository tags"
         
         # Create test tag patterns for common API levels (we check for any Android API level)
@@ -163,15 +209,11 @@ function Test-BaseRepositoryBuilds {
     )
     
     Write-HostWithPrefix "Checking base repository: $Repository"
-    
+
     try {
-        # Get tags from Docker Hub API for base repository
-        $dockerHubUri = "https://registry.hub.docker.com/v2/repositories/$Repository/tags?page_size=100"
-        Write-HostWithPrefix "Querying Docker Hub API for base repo: $dockerHubUri"
-        
-        $tagsResponse = Invoke-RestMethod -Uri $dockerHubUri -TimeoutSec 30
-        $existingTags = $tagsResponse.results | ForEach-Object { $_.name }
-        
+        # Get tags from registry
+        $existingTags = Get-RegistryTags -Repository $Repository
+
         Write-HostWithPrefix "Found $($existingTags.Count) base repository tags"
         
         # Create base tag patterns for both platforms
@@ -305,17 +347,13 @@ try {
     Write-HostWithPrefix "Looking for Linux tag: $linuxTag"
     Write-HostWithPrefix "Looking for Windows tag: $windowsTag"
     
-    # Check existing Docker Hub tags
-    Write-HostWithPrefix "Checking existing tags in Docker Hub for $DockerRepository..."
-    
+    # Check existing registry tags
+    Write-HostWithPrefix "Checking existing tags in registry for $DockerRepository..."
+
     try {
-        # Get tags from Docker Hub API
-        $dockerHubUri = "https://registry.hub.docker.com/v2/repositories/$DockerRepository/tags?page_size=100"
-        Write-HostWithPrefix "Querying Docker Hub API: $dockerHubUri"
-        
-        $tagsResponse = Invoke-RestMethod -Uri $dockerHubUri -TimeoutSec 30
-        $existingTags = $tagsResponse.results | ForEach-Object { $_.name }
-        
+        # Get tags from registry
+        $existingTags = Get-RegistryTags -Repository $DockerRepository
+
         Write-HostWithPrefix "Found $($existingTags.Count) existing tags"
         if ($existingTags.Count -le 10) {
             Write-HostWithPrefix "Existing tags: $($existingTags -join ', ')"
@@ -368,7 +406,7 @@ try {
         
     } catch {
         $errorMessage = $_.Exception.Message
-        Write-Warning "❌ Failed to check Docker Hub tags: $errorMessage"
+        Write-Warning "❌ Failed to check registry tags: $errorMessage"
         Write-HostWithPrefix "🔄 Assuming we need to build (fail-safe approach)"
         
         # In error case, still set the tag values if we have them
@@ -501,15 +539,11 @@ function Test-TestRepositoryBuilds {
     )
     
     Write-HostWithPrefix "Checking test repository: $Repository"
-    
+
     try {
-        # Get tags from Docker Hub API for test repository
-        $dockerHubUri = "https://registry.hub.docker.com/v2/repositories/$Repository/tags?page_size=100"
-        Write-HostWithPrefix "Querying Docker Hub API for test repo: $dockerHubUri"
-        
-        $tagsResponse = Invoke-RestMethod -Uri $dockerHubUri -TimeoutSec 30
-        $existingTags = $tagsResponse.results | ForEach-Object { $_.name }
-        
+        # Get tags from registry
+        $existingTags = Get-RegistryTags -Repository $Repository
+
         Write-HostWithPrefix "Found $($existingTags.Count) test repository tags"
         
         # Create test tag patterns for common API levels (we check for any Android API level)

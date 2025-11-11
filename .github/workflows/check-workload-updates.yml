@@ -3,6 +3,7 @@ name: 🔍 Check for Workload Updates
 permissions:
   contents: read
   actions: write
+  packages: read
 
 on:
   schedule:
@@ -42,6 +43,8 @@ jobs:
     - name: 🔍 Check for New Workload Set Versions
       id: check-versions
       shell: pwsh
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         if ("${{ inputs.force_build }}" -eq "true") {
           ./check-workload-updates.ps1 -DockerRepository "${{ env.DOCKER_REPOSITORY }}" -TestDockerRepository "${{ env.DOCKER_REPOSITORY_TEST }}" -ForceBuild
