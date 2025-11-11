@@ -25,32 +25,55 @@ jobs:
     name: 🔍 Check for New Workload Set Versions
     runs-on: ubuntu-latest
     outputs:
-      trigger-builds: ${{ steps.check-versions.outputs.trigger-builds }}
-      new-version: ${{ steps.check-versions.outputs.new-version }}
-      workload-set-version: ${{ steps.check-versions.outputs.workload-set-version }}
-      dotnet-command-workload-set-version: ${{ steps.check-versions.outputs.dotnet-command-workload-set-version }}
-      linux-tag: ${{ steps.check-versions.outputs.linux-tag }}
-      windows-tag: ${{ steps.check-versions.outputs.windows-tag }}
-      has-linux-base-build: ${{ steps.check-versions.outputs.has-linux-base-build }}
-      has-windows-base-build: ${{ steps.check-versions.outputs.has-windows-base-build }}
-      has-any-base-build: ${{ steps.check-versions.outputs.has-any-base-build }}
-      force-build: ${{ steps.check-versions.outputs.force-build }}
-    
+      trigger-builds: ${{ steps.aggregate-results.outputs.trigger-builds }}
+      force-build: ${{ steps.aggregate-results.outputs.force-build }}
+
     steps:
     - name: 🛒 Checkout
       uses: actions/checkout@v4
 
-    - name: 🔍 Check for New Workload Set Versions
-      id: check-versions
+    - name: 🔍 Check .NET 9.0 Workload Set Versions
+      id: check-dotnet9
       shell: pwsh
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         if ("${{ inputs.force_build }}" -eq "true") {
-          ./check-workload-updates.ps1 -DockerRepository "${{ env.DOCKER_REPOSITORY }}" -TestDockerRepository "${{ env.DOCKER_REPOSITORY_TEST }}" -ForceBuild
+          ./check-workload-updates.ps1 -DotnetVersion "9.0" -DockerRepository "${{ env.DOCKER_REPOSITORY }}" -TestDockerRepository "${{ env.DOCKER_REPOSITORY_TEST }}" -ForceBuild
         } else {
-          ./check-workload-updates.ps1 -DockerRepository "${{ env.DOCKER_REPOSITORY }}" -TestDockerRepository "${{ env.DOCKER_REPOSITORY_TEST }}"
+          ./check-workload-updates.ps1 -DotnetVersion "9.0" -DockerRepository "${{ env.DOCKER_REPOSITORY }}" -TestDockerRepository "${{ env.DOCKER_REPOSITORY_TEST }}"
         }
+
+    - name: 🔍 Check .NET 10.0 Workload Set Versions
+      id: check-dotnet10
+      shell: pwsh
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        if ("${{ inputs.force_build }}" -eq "true") {
+          ./check-workload-updates.ps1 -DotnetVersion "10.0" -DockerRepository "${{ env.DOCKER_REPOSITORY }}" -TestDockerRepository "${{ env.DOCKER_REPOSITORY_TEST }}" -ForceBuild
+        } else {
+          ./check-workload-updates.ps1 -DotnetVersion "10.0" -DockerRepository "${{ env.DOCKER_REPOSITORY }}" -TestDockerRepository "${{ env.DOCKER_REPOSITORY_TEST }}"
+        }
+
+    - name: 📊 Aggregate Results
+      id: aggregate-results
+      shell: pwsh
+      run: |
+        $dotnet9TriggerBuilds = "${{ steps.check-dotnet9.outputs.trigger-builds }}"
+        $dotnet10TriggerBuilds = "${{ steps.check-dotnet10.outputs.trigger-builds }}"
+        $forceBuild = "${{ inputs.force_build }}"
+
+        # Trigger builds if ANY .NET version has updates OR force build is enabled
+        $triggerBuilds = ($dotnet9TriggerBuilds -eq "true") -or ($dotnet10TriggerBuilds -eq "true") -or ($forceBuild -eq "true")
+
+        Write-Host "🔍 .NET 9.0 trigger builds: $dotnet9TriggerBuilds"
+        Write-Host "🔍 .NET 10.0 trigger builds: $dotnet10TriggerBuilds"
+        Write-Host "🔍 Force build: $forceBuild"
+        Write-Host "🔍 Overall trigger builds: $triggerBuilds"
+
+        echo "trigger-builds=$($triggerBuilds.ToString().ToLower())" >> $env:GITHUB_OUTPUT
+        echo "force-build=$($forceBuild.ToString().ToLower())" >> $env:GITHUB_OUTPUT
 
   trigger-build-docker:
     name: 🚀 Trigger Docker Image Builds
@@ -64,10 +87,8 @@ jobs:
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
-          const workloadVersion = '${{ needs.check-updates.outputs.workload-set-version }}';
-
-          console.log(`Triggering build-docker workflow - detected workload update: ${workloadVersion}`);
-          console.log('Note: Each .NET version will auto-detect its appropriate workload version');
+          console.log('Triggering build-docker workflow - workload update(s) detected');
+          console.log('Each .NET version (9.0 and 10.0) will auto-detect its appropriate workload version');
 
           try {
             await github.rest.actions.createWorkflowDispatch({
@@ -75,9 +96,7 @@ jobs:
               repo: context.repo.repo,
               workflow_id: 'build-docker.yml',
               ref: 'main',
-              inputs: {
-                workload_set_version: workloadVersion
-              }
+              inputs: {}
             });
             console.log('✅ Successfully triggered build-docker workflow');
           } catch (error) {
@@ -89,9 +108,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               event_type: 'trigger-docker-build',
-              client_payload: {
-                workload_set_version: workloadVersion
-              }
+              client_payload: {}
             });
             console.log('✅ Successfully sent repository dispatch event');
           }
@@ -108,10 +125,8 @@ jobs:
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
-          const workloadVersion = '${{ needs.check-updates.outputs.workload-set-version }}';
-
-          console.log(`Triggering build-emulators workflow - detected workload update: ${workloadVersion}`);
-          console.log('Note: Each .NET version will auto-detect its appropriate workload version');
+          console.log('Triggering build-emulators workflow - workload update(s) detected');
+          console.log('Each .NET version (9.0 and 10.0) will auto-detect its appropriate workload version');
 
           try {
             await github.rest.actions.createWorkflowDispatch({
@@ -119,9 +134,7 @@ jobs:
               repo: context.repo.repo,
               workflow_id: 'build-emulators.yml',
               ref: 'main',
-              inputs: {
-                workload_set_version: workloadVersion
-              }
+              inputs: {}
             });
             console.log('✅ Successfully triggered build-emulators workflow');
           } catch (error) {
@@ -133,9 +146,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               event_type: 'trigger-emulators-build',
-              client_payload: {
-                workload_set_version: workloadVersion
-              }
+              client_payload: {}
             });
             console.log('✅ Successfully sent repository dispatch event');
           }
@@ -186,25 +197,28 @@ jobs:
     - name: 📢 Summary
       run: |
         echo "## Workload Update Check Results" >> $GITHUB_STEP_SUMMARY
-        echo "- **Latest workload set version:** ${{ needs.check-updates.outputs.workload-set-version }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Dotnet command version:** ${{ needs.check-updates.outputs.dotnet-command-workload-set-version }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Expected Linux tag:** ${{ needs.check-updates.outputs.linux-tag }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Expected Windows tag:** ${{ needs.check-updates.outputs.windows-tag }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **New version found:** ${{ needs.check-updates.outputs.new-version }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Check Status" >> $GITHUB_STEP_SUMMARY
         echo "- **Builds triggered:** ${{ needs.check-updates.outputs.trigger-builds }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Force build:** ${{ needs.check-updates.outputs.force-build }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Individual .NET Version Checks" >> $GITHUB_STEP_SUMMARY
+        echo "The workflow checked for workload updates for .NET 9.0 and 10.0 separately." >> $GITHUB_STEP_SUMMARY
+        echo "Each .NET version auto-detects its appropriate workload version during builds." >> $GITHUB_STEP_SUMMARY
 
         if [[ "${{ needs.check-updates.outputs.trigger-builds }}" == "true" ]]; then
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Build Status" >> $GITHUB_STEP_SUMMARY
           echo "- **Docker image builds status:** ${{ needs.trigger-build-docker.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Emulator image builds status:** ${{ needs.trigger-build-emulators.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Tart VM builds status:** ${{ needs.trigger-build-tart.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           if [[ "${{ needs.check-updates.outputs.force-build }}" == "true" ]]; then
-            echo "🔄 Force build triggered!" >> $GITHUB_STEP_SUMMARY
+            echo "🔄 **Force build triggered!**" >> $GITHUB_STEP_SUMMARY
             echo "   - All images will be rebuilt regardless of existing tags" >> $GITHUB_STEP_SUMMARY
           else
-            echo "✅ New workload set version detected!" >> $GITHUB_STEP_SUMMARY
+            echo "✅ **New workload set version(s) detected!**" >> $GITHUB_STEP_SUMMARY
           fi
 
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -214,5 +228,5 @@ jobs:
           echo "3. **Tart VM Images** (macOS) - MAUI development VMs with integrated runners" >> $GITHUB_STEP_SUMMARY
         else
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "ℹ️ No new workload set version found. All builds are up to date." >> $GITHUB_STEP_SUMMARY
+          echo "ℹ️ **No new workload set versions found.** All builds are up to date." >> $GITHUB_STEP_SUMMARY
         fi
