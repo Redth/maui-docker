@@ -142,7 +142,7 @@ start_github_runner() {
 
   cleanup_github() {
     log "Removing GitHub runner..."
-    ./config.sh remove --unattended --token ${REG_TOKEN}
+    ./config.sh remove --token ${REG_TOKEN}
   }
 
   trap 'cleanup_github; exit 130' INT

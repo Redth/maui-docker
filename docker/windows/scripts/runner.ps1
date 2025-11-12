@@ -231,7 +231,7 @@ function Invoke-Cleanup {
     if ($script:GitHubCleanupToken) {
         try {
             Set-Location -Path "C:\actions-runner"
-            & .\config.cmd remove --unattended --token $script:GitHubCleanupToken
+            & .\config.cmd remove --token $script:GitHubCleanupToken
         } catch {
             Write-Log "Error during GitHub runner cleanup: $_"
         }
