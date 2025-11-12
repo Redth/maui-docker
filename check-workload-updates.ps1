@@ -12,8 +12,11 @@
 .PARAMETER DotnetVersion
     The .NET version to check for workload sets. Defaults to "9.0".
 
-.PARAMETER DockerRepository
-    The Docker repository to check for existing tags. Defaults to "ghcr.io/maui-containers/maui-linux".
+.PARAMETER LinuxDockerRepository
+    The Linux Docker repository to check for existing tags. Defaults to "ghcr.io/maui-containers/maui-linux".
+
+.PARAMETER WindowsDockerRepository
+    The Windows Docker repository to check for existing tags. Defaults to "ghcr.io/maui-containers/maui-windows".
 
 .PARAMETER TestDockerRepository
     The test Docker repository to check for existing tags. Defaults to "ghcr.io/maui-containers/maui-emulator-linux".
@@ -45,7 +48,7 @@
     .\check-workload-updates.ps1
     
 .EXAMPLE
-    .\check-workload-updates.ps1 -DotnetVersion "9.0" -DockerRepository "myrepo/myimage" -OutputFormat "object"
+    .\check-workload-updates.ps1 -DotnetVersion "9.0" -LinuxDockerRepository "ghcr.io/myorg/maui-linux" -WindowsDockerRepository "ghcr.io/myorg/maui-windows" -OutputFormat "object"
 
 .EXAMPLE
     .\check-workload-updates.ps1 -ForceBuild -DotnetVersion "9.0"
@@ -56,18 +59,21 @@ param(
     [string]$DotnetVersion = "9.0",
 
     [Parameter(Position = 1)]
-    [string]$DockerRepository = "ghcr.io/maui-containers/maui-linux",
+    [string]$LinuxDockerRepository = "ghcr.io/maui-containers/maui-linux",
 
     [Parameter(Position = 2)]
+    [string]$WindowsDockerRepository = "ghcr.io/maui-containers/maui-windows",
+
+    [Parameter(Position = 3)]
     [string]$TestDockerRepository = "ghcr.io/maui-containers/maui-emulator-linux",
     
-    [Parameter(Position = 3)]
+    [Parameter(Position = 4)]
     [string]$TagPattern = "{platform}-dotnet{dotnet_version}-workloads{workload_version}",
     
-    [Parameter(Position = 4)]
+    [Parameter(Position = 5)]
     [string]$TestTagPattern = "{platform}-dotnet{dotnet_version}-workloads{workload_version}-android{api_level}",
     
-    [Parameter(Position = 5)]
+    [Parameter(Position = 6)]
     [ValidateSet("github-actions", "object")]
     [string]$OutputFormat = "github-actions",
     
@@ -202,49 +208,47 @@ function Test-TestRepositoryBuilds {
 # Function to check for existing base builds
 function Test-BaseRepositoryBuilds {
     param(
-        [string]$Repository,
-        [string]$TagPattern,
+        [string]$LinuxRepository,
+        [string]$WindowsRepository,
         [string]$DotnetVersion,
         [string]$WorkloadVersion
     )
     
-    Write-HostWithPrefix "Checking base repository: $Repository"
-
+    # Build the expected tag format (without platform prefix)
+    # Actual tags are: dotnet{version}-workloads{workload_version}
+    $expectedTag = "dotnet$DotnetVersion-workloads$WorkloadVersion"
+    
+    Write-HostWithPrefix "Checking Linux repository: $LinuxRepository"
+    $hasLinuxBase = $false
     try {
-        # Get tags from registry
-        $existingTags = Get-RegistryTags -Repository $Repository
-
-        Write-HostWithPrefix "Found $($existingTags.Count) base repository tags"
-        
-        # Create base tag patterns for both platforms
-        $linuxBaseTag = $TagPattern -replace '\{platform\}', 'linux' -replace '\{dotnet_version\}', $DotnetVersion -replace '\{workload_version\}', $WorkloadVersion
-        $windowsBaseTag = $TagPattern -replace '\{platform\}', 'windows' -replace '\{dotnet_version\}', $DotnetVersion -replace '\{workload_version\}', $WorkloadVersion
-        
-        $hasLinuxBase = $existingTags -contains $linuxBaseTag
-        $hasWindowsBase = $existingTags -contains $windowsBaseTag
-        $hasAnyBase = $hasLinuxBase -or $hasWindowsBase
-        
-        Write-HostWithPrefix "Linux base tag: $linuxBaseTag - Exists: $hasLinuxBase"
-        Write-HostWithPrefix "Windows base tag: $windowsBaseTag - Exists: $hasWindowsBase"
-        Write-HostWithPrefix "Has any base builds: $hasAnyBase"
-        
-        return @{
-            HasLinuxBase = $hasLinuxBase
-            HasWindowsBase = $hasWindowsBase
-            HasAnyBase = $hasAnyBase
-            LinuxBaseTag = $linuxBaseTag
-            WindowsBaseTag = $windowsBaseTag
-        }
-        
+        $linuxTags = Get-RegistryTags -Repository $LinuxRepository
+        Write-HostWithPrefix "Found $($linuxTags.Count) tags in Linux repository"
+        $hasLinuxBase = $linuxTags -contains $expectedTag
+        Write-HostWithPrefix "Linux base tag '$expectedTag' - Exists: $hasLinuxBase"
     } catch {
-        Write-HostWithPrefix "Warning: Could not check base repository $Repository - $($_.Exception.Message)"
-        return @{
-            HasLinuxBase = $false
-            HasWindowsBase = $false
-            HasAnyBase = $false
-            LinuxBaseTag = ""
-            WindowsBaseTag = ""
-        }
+        Write-HostWithPrefix "Warning: Could not check Linux repository $LinuxRepository - $($_.Exception.Message)"
+    }
+    
+    Write-HostWithPrefix "Checking Windows repository: $WindowsRepository"
+    $hasWindowsBase = $false
+    try {
+        $windowsTags = Get-RegistryTags -Repository $WindowsRepository
+        Write-HostWithPrefix "Found $($windowsTags.Count) tags in Windows repository"
+        $hasWindowsBase = $windowsTags -contains $expectedTag
+        Write-HostWithPrefix "Windows base tag '$expectedTag' - Exists: $hasWindowsBase"
+    } catch {
+        Write-HostWithPrefix "Warning: Could not check Windows repository $WindowsRepository - $($_.Exception.Message)"
+    }
+    
+    $hasAnyBase = $hasLinuxBase -or $hasWindowsBase
+    Write-HostWithPrefix "Has any base builds: $hasAnyBase"
+    
+    return @{
+        HasLinuxBase = $hasLinuxBase
+        HasWindowsBase = $hasWindowsBase
+        HasAnyBase = $hasAnyBase
+        LinuxBaseTag = $expectedTag
+        WindowsBaseTag = $expectedTag
     }
 }
 
@@ -255,10 +259,10 @@ try {
     $triggerBuilds = $false
     $newVersion = $false
     $errorMessage = $null
-    $hasLinuxBuild = $false
-    $hasWindowsBuild = $false
     $hasTestBuilds = $false
-    $hasWindowsBuild = $false
+    $hasLinuxBaseBuild = $false
+    $hasWindowsBaseBuild = $false
+    $hasAnyBaseBuild = $false
     $linuxTag = ""
     $windowsTag = ""
     $latestVersion = ""
@@ -348,38 +352,21 @@ try {
     Write-HostWithPrefix "Looking for Windows tag: $windowsTag"
     
     # Check existing registry tags
-    Write-HostWithPrefix "Checking existing tags in registry for $DockerRepository..."
+    Write-HostWithPrefix "Checking existing tags in registries..."
 
     try {
-        # Get tags from registry
-        $existingTags = Get-RegistryTags -Repository $DockerRepository
-
-        Write-HostWithPrefix "Found $($existingTags.Count) existing tags"
-        if ($existingTags.Count -le 10) {
-            Write-HostWithPrefix "Existing tags: $($existingTags -join ', ')"
-        } else {
-            Write-HostWithPrefix "First 10 tags: $($existingTags[0..9] -join ', ')..."
-        }
-        
-        # Check if we already have builds for this workload set version
-        $hasLinuxBuild = $existingTags -contains $linuxTag
-        $hasWindowsBuild = $existingTags -contains $windowsTag
-        
-        Write-HostWithPrefix "Has Linux build for tag '$linuxTag': $hasLinuxBuild"
-        Write-HostWithPrefix "Has Windows build for tag '$windowsTag': $hasWindowsBuild"
-        
         # Also check test repository for builds
         $hasTestBuilds = Test-TestRepositoryBuilds -Repository $TestDockerRepository -TagPattern $TestTagPattern -DotnetVersion $DotnetVersion -WorkloadVersion $dotnetCommandWorkloadSetVersion
         Write-HostWithPrefix "Has test builds: $hasTestBuilds"
         
-        # Check Docker repository for builds (now includes integrated runner support)
-        $baseBuilds = Test-BaseRepositoryBuilds -Repository $DockerRepository -TagPattern $TagPattern -DotnetVersion $DotnetVersion -WorkloadVersion $dotnetCommandWorkloadSetVersion
+        # Check Docker repositories for builds (Linux and Windows are separate repos)
+        $baseBuilds = Test-BaseRepositoryBuilds -LinuxRepository $LinuxDockerRepository -WindowsRepository $WindowsDockerRepository -DotnetVersion $DotnetVersion -WorkloadVersion $dotnetCommandWorkloadSetVersion
         $hasLinuxBaseBuild = $baseBuilds.HasLinuxBase
         $hasWindowsBaseBuild = $baseBuilds.HasWindowsBase
         $hasAnyBaseBuild = $baseBuilds.HasAnyBase
         Write-HostWithPrefix "Has Docker image builds: $hasAnyBaseBuild (Linux: $hasLinuxBaseBuild, Windows: $hasWindowsBaseBuild)"
         
-        $hasAnyBuild = $hasLinuxBuild -or $hasWindowsBuild -or $hasTestBuilds -or $hasAnyBaseBuild
+        $hasAnyBuild = $hasTestBuilds -or $hasAnyBaseBuild
         Write-HostWithPrefix "Has any existing build (Docker images or test): $hasAnyBuild"
         
         # Check if we should force build regardless of existing tags
@@ -393,9 +380,9 @@ try {
             $newVersion = $true
         } else {
             Write-HostWithPrefix "ℹ️ Workload set version $dotnetCommandWorkloadSetVersion already built. No action needed."
-            if ($hasLinuxBuild -and $hasWindowsBuild) {
+            if ($hasLinuxBaseBuild -and $hasWindowsBaseBuild) {
                 Write-HostWithPrefix "   Both Linux and Windows builds exist."
-            } elseif ($hasLinuxBuild) {
+            } elseif ($hasLinuxBaseBuild) {
                 Write-HostWithPrefix "   Only Linux build exists, Windows build may be needed."
             } else {
                 Write-HostWithPrefix "   Only Windows build exists, Linux build may be needed."
@@ -426,8 +413,6 @@ try {
         DotnetCommandWorkloadSetVersion = $dotnetCommandWorkloadSetVersion
         LinuxTag = $linuxTag
         WindowsTag = $windowsTag
-        HasLinuxBuild = $hasLinuxBuild
-        HasWindowsBuild = $hasWindowsBuild
         HasTestBuilds = $hasTestBuilds
         HasLinuxBaseBuild = $hasLinuxBaseBuild
         HasWindowsBaseBuild = $hasWindowsBaseBuild
@@ -439,7 +424,8 @@ try {
         XcodeRecommendedVersion = $xcodeRecommendedVersion
         XcodeMajorVersion = $xcodeMajorVersion
         ErrorMessage = $errorMessage
-        DockerRepository = $DockerRepository
+        LinuxDockerRepository = $LinuxDockerRepository
+        WindowsDockerRepository = $WindowsDockerRepository
         TestDockerRepository = $TestDockerRepository
         DotnetVersion = $DotnetVersion
     }
@@ -498,8 +484,10 @@ try {
         DotnetCommandWorkloadSetVersion = $dotnetCommandWorkloadSetVersion
         LinuxTag = $linuxTag
         WindowsTag = $windowsTag
-        HasLinuxBuild = $false
-        HasWindowsBuild = $false
+        HasTestBuilds = $false
+        HasLinuxBaseBuild = $false
+        HasWindowsBaseBuild = $false
+        HasAnyBaseBuild = $false
         TriggerBuilds = $true
         NewVersion = $true
         ForceBuild = $ForceBuild.IsPresent
@@ -507,7 +495,9 @@ try {
         XcodeRecommendedVersion = $xcodeRecommendedVersion
         XcodeMajorVersion = $xcodeMajorVersion
         ErrorMessage = $_.Exception.Message
-        DockerRepository = $DockerRepository
+        LinuxDockerRepository = $LinuxDockerRepository
+        WindowsDockerRepository = $WindowsDockerRepository
+        TestDockerRepository = $TestDockerRepository
         DotnetVersion = $DotnetVersion
     }
     
@@ -527,49 +517,4 @@ try {
     }
     
     exit 1
-}
-
-# Function to check for existing test builds with Android API levels
-function Test-TestRepositoryBuilds {
-    param(
-        [string]$Repository,
-        [string]$TagPattern,
-        [string]$DotnetVersion,
-        [string]$WorkloadVersion
-    )
-    
-    Write-HostWithPrefix "Checking test repository: $Repository"
-
-    try {
-        # Get tags from registry
-        $existingTags = Get-RegistryTags -Repository $Repository
-
-        Write-HostWithPrefix "Found $($existingTags.Count) test repository tags"
-        
-        # Create test tag patterns for common API levels (we check for any Android API level)
-        # The test tag pattern is: appium-emulator-linux-dotnet{version}-workloads{workload}-android{api}
-        $testPlatform = "appium-emulator-linux"
-        $testTagPattern = $TagPattern -replace '\{platform\}', $testPlatform -replace '\{dotnet_version\}', $DotnetVersion -replace '\{workload_version\}', $WorkloadVersion
-        
-        # Check if any tag matches the pattern with any API level
-        $matchingTags = $existingTags | Where-Object { 
-            $_ -match "^$($testTagPattern -replace '\{api_level\}', '\d+')" 
-        }
-        
-        $hasTestBuilds = $matchingTags.Count -gt 0
-        
-        Write-HostWithPrefix "Test tag pattern (with API level): $($testTagPattern -replace '\{api_level\}', 'XX')"
-        Write-HostWithPrefix "Matching test tags found: $($matchingTags.Count)"
-        if ($matchingTags.Count -gt 0 -and $matchingTags.Count -le 5) {
-            Write-HostWithPrefix "Sample matching tags: $($matchingTags -join ', ')"
-        } elseif ($matchingTags.Count -gt 5) {
-            Write-HostWithPrefix "Sample matching tags: $($matchingTags[0..4] -join ', ')..."
-        }
-        
-        return $hasTestBuilds
-        
-    } catch {
-        Write-HostWithPrefix "Warning: Could not check test repository $Repository - $($_.Exception.Message)"
-        return $false
-    }
 }

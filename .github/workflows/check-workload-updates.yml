@@ -17,7 +17,8 @@ on:
         type: boolean
 
 env:
-  DOCKER_REPOSITORY: ghcr.io/maui-containers/maui-linux
+  DOCKER_REPOSITORY_LINUX: ghcr.io/maui-containers/maui-linux
+  DOCKER_REPOSITORY_WINDOWS: ghcr.io/maui-containers/maui-windows
   DOCKER_REPOSITORY_TEST: ghcr.io/maui-containers/maui-emulator-linux
 
 jobs:
@@ -39,9 +40,9 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         if ("${{ inputs.force_build }}" -eq "true") {
-          ./check-workload-updates.ps1 -DotnetVersion "9.0" -DockerRepository "${{ env.DOCKER_REPOSITORY }}" -TestDockerRepository "${{ env.DOCKER_REPOSITORY_TEST }}" -ForceBuild
+          ./check-workload-updates.ps1 -DotnetVersion "9.0" -LinuxDockerRepository "${{ env.DOCKER_REPOSITORY_LINUX }}" -WindowsDockerRepository "${{ env.DOCKER_REPOSITORY_WINDOWS }}" -TestDockerRepository "${{ env.DOCKER_REPOSITORY_TEST }}" -ForceBuild
         } else {
-          ./check-workload-updates.ps1 -DotnetVersion "9.0" -DockerRepository "${{ env.DOCKER_REPOSITORY }}" -TestDockerRepository "${{ env.DOCKER_REPOSITORY_TEST }}"
+          ./check-workload-updates.ps1 -DotnetVersion "9.0" -LinuxDockerRepository "${{ env.DOCKER_REPOSITORY_LINUX }}" -WindowsDockerRepository "${{ env.DOCKER_REPOSITORY_WINDOWS }}" -TestDockerRepository "${{ env.DOCKER_REPOSITORY_TEST }}"
         }
 
     - name: 🔍 Check .NET 10.0 Workload Set Versions
@@ -51,9 +52,9 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         if ("${{ inputs.force_build }}" -eq "true") {
-          ./check-workload-updates.ps1 -DotnetVersion "10.0" -DockerRepository "${{ env.DOCKER_REPOSITORY }}" -TestDockerRepository "${{ env.DOCKER_REPOSITORY_TEST }}" -ForceBuild
+          ./check-workload-updates.ps1 -DotnetVersion "10.0" -LinuxDockerRepository "${{ env.DOCKER_REPOSITORY_LINUX }}" -WindowsDockerRepository "${{ env.DOCKER_REPOSITORY_WINDOWS }}" -TestDockerRepository "${{ env.DOCKER_REPOSITORY_TEST }}" -ForceBuild
         } else {
-          ./check-workload-updates.ps1 -DotnetVersion "10.0" -DockerRepository "${{ env.DOCKER_REPOSITORY }}" -TestDockerRepository "${{ env.DOCKER_REPOSITORY_TEST }}"
+          ./check-workload-updates.ps1 -DotnetVersion "10.0" -LinuxDockerRepository "${{ env.DOCKER_REPOSITORY_LINUX }}" -WindowsDockerRepository "${{ env.DOCKER_REPOSITORY_WINDOWS }}" -TestDockerRepository "${{ env.DOCKER_REPOSITORY_TEST }}"
         }
 
     - name: 📊 Aggregate Results
