@@ -278,7 +278,12 @@ function Get-NuGetPackageContent {
         Invoke-WebRequest -Uri $nugetUrl -OutFile $nupkgPath
         
         # Extract the package (nupkg files are zip files)
-        Expand-Archive -Path $nupkgPath -DestinationPath $extractPath -Force
+        # Rename to .zip for compatibility with PowerShell 5.1's Expand-Archive
+        $zipPath = $nupkgPath -replace '\.nupkg$', '.zip'
+        if ($nupkgPath -ne $zipPath) {
+            Move-Item -Path $nupkgPath -Destination $zipPath -Force
+        }
+        Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
         
         # Check if the requested file exists
         $targetFile = Join-Path $extractPath $FilePath
