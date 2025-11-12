@@ -124,7 +124,8 @@ Test Image (Base + Appium/Emulator)
 
 **Primary Workflows:**
 - `check-workload-updates.yml` - Automated version monitoring and build triggering
-- `build-docker.yml` - Docker images (Linux + Windows with integrated runners)
+- `build-docker-linux.yml` - Linux Docker images with integrated runners
+- `build-docker-windows.yml` - Windows Docker images with integrated runners
 - `build-emulators.yml` - Android emulator images (with Appium)
 - `build-tart-vms.yml` - macOS Tart VM images
 - `pr-validation.yml` - PR validation builds

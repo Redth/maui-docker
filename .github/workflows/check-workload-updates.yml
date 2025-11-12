@@ -76,30 +76,30 @@ jobs:
         echo "trigger-builds=$($triggerBuilds.ToString().ToLower())" >> $env:GITHUB_OUTPUT
         echo "force-build=$($forceBuild.ToString().ToLower())" >> $env:GITHUB_OUTPUT
 
-  trigger-build-docker:
-    name: 🚀 Trigger Docker Image Builds
+  trigger-build-docker-linux:
+    name: 🚀 Trigger Docker Linux Image Builds
     needs: check-updates
     if: needs.check-updates.outputs.trigger-builds == 'true'
     runs-on: ubuntu-latest
 
     steps:
-    - name: 🚀 Trigger Build Docker Workflow
+    - name: 🚀 Trigger Build Docker Linux Workflow
       uses: actions/github-script@v7
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
-          console.log('Triggering build-docker workflow - workload update(s) detected');
+          console.log('Triggering build-docker-linux workflow - workload update(s) detected');
           console.log('Each .NET version (9.0 and 10.0) will auto-detect its appropriate workload version');
 
           try {
             await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              workflow_id: 'build-docker.yml',
+              workflow_id: 'build-docker-linux.yml',
               ref: 'main',
               inputs: {}
             });
-            console.log('✅ Successfully triggered build-docker workflow');
+            console.log('✅ Successfully triggered build-docker-linux workflow');
           } catch (error) {
             console.log(`❌ Failed to trigger workflow: ${error.message}`);
             console.log('🔄 Trying alternative approach with repository dispatch...');
@@ -108,7 +108,45 @@ jobs:
             await github.rest.repos.createDispatchEvent({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              event_type: 'trigger-docker-build',
+              event_type: 'trigger-docker-linux-build',
+              client_payload: {}
+            });
+            console.log('✅ Successfully sent repository dispatch event');
+          }
+
+  trigger-build-docker-windows:
+    name: 🚀 Trigger Docker Windows Image Builds
+    needs: check-updates
+    if: needs.check-updates.outputs.trigger-builds == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 🚀 Trigger Build Docker Windows Workflow
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          console.log('Triggering build-docker-windows workflow - workload update(s) detected');
+          console.log('Each .NET version (9.0 and 10.0) will auto-detect its appropriate workload version');
+
+          try {
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'build-docker-windows.yml',
+              ref: 'main',
+              inputs: {}
+            });
+            console.log('✅ Successfully triggered build-docker-windows workflow');
+          } catch (error) {
+            console.log(`❌ Failed to trigger workflow: ${error.message}`);
+            console.log('🔄 Trying alternative approach with repository dispatch...');
+
+            // Alternative: Use repository dispatch
+            await github.rest.repos.createDispatchEvent({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              event_type: 'trigger-docker-windows-build',
               client_payload: {}
             });
             console.log('✅ Successfully sent repository dispatch event');
@@ -190,7 +228,7 @@ jobs:
 
   notify-results:
     name: 📢 Notify Results
-    needs: [check-updates, trigger-build-docker, trigger-build-emulators, trigger-build-tart]
+    needs: [check-updates, trigger-build-docker-linux, trigger-build-docker-windows, trigger-build-emulators, trigger-build-tart]
     if: always()
     runs-on: ubuntu-latest
 
@@ -210,7 +248,8 @@ jobs:
         if [[ "${{ needs.check-updates.outputs.trigger-builds }}" == "true" ]]; then
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Build Status" >> $GITHUB_STEP_SUMMARY
-          echo "- **Docker image builds status:** ${{ needs.trigger-build-docker.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Docker Linux image builds status:** ${{ needs.trigger-build-docker-linux.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Docker Windows image builds status:** ${{ needs.trigger-build-docker-windows.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Emulator image builds status:** ${{ needs.trigger-build-emulators.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Tart VM builds status:** ${{ needs.trigger-build-tart.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -224,9 +263,10 @@ jobs:
 
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Triggered Workflows:" >> $GITHUB_STEP_SUMMARY
-          echo "1. **Docker Images** (Linux + Windows) - Includes integrated GitHub/Gitea runner support" >> $GITHUB_STEP_SUMMARY
-          echo "2. **Emulator Images** (Linux) - Android emulator with Appium" >> $GITHUB_STEP_SUMMARY
-          echo "3. **Tart VM Images** (macOS) - MAUI development VMs with integrated runners" >> $GITHUB_STEP_SUMMARY
+          echo "1. **Docker Linux Images** - Includes integrated GitHub/Gitea runner support" >> $GITHUB_STEP_SUMMARY
+          echo "2. **Docker Windows Images** - Includes integrated GitHub/Gitea runner support" >> $GITHUB_STEP_SUMMARY
+          echo "3. **Emulator Images** (Linux) - Android emulator with Appium" >> $GITHUB_STEP_SUMMARY
+          echo "4. **Tart VM Images** (macOS) - MAUI development VMs with integrated runners" >> $GITHUB_STEP_SUMMARY
         else
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "ℹ️ **No new workload set versions found.** All builds are up to date." >> $GITHUB_STEP_SUMMARY

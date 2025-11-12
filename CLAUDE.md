@@ -98,7 +98,8 @@ The build system:
 ### GitHub Actions Integration
 Comprehensive CI/CD workflows in `.github/workflows/`:
 - `check-workload-updates.yml` - Monitors for workload updates and triggers builds
-- `build-docker.yml` - Builds Docker images (Linux + Windows with integrated runners)
+- `build-docker-linux.yml` - Builds Linux Docker images with integrated runners
+- `build-docker-windows.yml` - Builds Windows Docker images with integrated runners
 - `build-emulators.yml` - Builds Android emulator images for multiple API levels
 - `build-tart-vms.yml` - Builds macOS Tart VM images
 - `pr-validation.yml` - Validates PRs with test builds

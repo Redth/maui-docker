@@ -1,0 +1,74 @@
+name: 🐋 Build Docker Images (Windows)
+
+on:
+  workflow_dispatch:
+    inputs:
+      workload_set_version:
+        description: 'Specific workload set version to use'
+        required: false
+        type: string
+      dotnet_versions:
+        description: 'JSON array of .NET versions to build (e.g., ["9.0", "10.0"])'
+        required: false
+        type: string
+        default: '["9.0", "10.0"]'
+  repository_dispatch:
+    types: [trigger-docker-windows-build]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-windows:
+    name: 🪟 Build Windows (.NET ${{ matrix.DOTNET_VERSION }})
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
+        DOTNET_VERSION: ${{ fromJson(inputs.dotnet_versions || '["9.0", "10.0"]') }}
+
+    steps:
+    - name: 🛒 Checkout
+      uses: actions/checkout@v4
+
+    - name: 📋 Set Variables
+      id: vars
+      run: |
+        # Determine workload set version from either workflow_dispatch input or repository_dispatch payload
+        if ("${{ github.event_name }}" -eq "repository_dispatch") {
+          $env:WORKLOAD_SET_VERSION = "${{ github.event.client_payload.workload_set_version }}"
+        } else {
+          $env:WORKLOAD_SET_VERSION = "${{ inputs.workload_set_version }}"
+        }
+        echo "workload_set_version=$env:WORKLOAD_SET_VERSION" >> $env:GITHUB_OUTPUT
+        Write-Host "Using workload set version: $env:WORKLOAD_SET_VERSION"
+
+    - name: 🐋 Login to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: 🔨 Build Docker Image
+      shell: pwsh
+      run: |
+        # Build arguments
+        $buildArgs = @{
+          DotNetVersion     = "${{ matrix.DOTNET_VERSION }}"
+          Version           = "${{ github.run_id }}"
+          DockerPlatform    = "windows/amd64"
+          Load              = $true
+        }
+
+        if ("${{ github.ref }}" -eq "refs/heads/main") {
+          $buildArgs.Push = $true
+        }
+
+        # Add workload set version if specified
+        if ("${{ steps.vars.outputs.workload_set_version }}" -ne "") {
+          $buildArgs.WorkloadSetVersion = "${{ steps.vars.outputs.workload_set_version }}"
+        }
+
+        ./docker/build.ps1 @buildArgs
