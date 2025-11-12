@@ -107,6 +107,11 @@ start_github_runner() {
   if [ -n "${EPHEMERAL}" ]; then
     log "Ephemeral option is enabled"
     ARGS+=("--ephemeral")
+    # Auto-disable updates for ephemeral runners unless explicitly overridden
+    if [ -z "${DISABLE_AUTO_UPDATE}" ]; then
+      log "Auto-disabling updates for ephemeral runner"
+      DISABLE_AUTO_UPDATE="true"
+    fi
   fi
 
   if [ -n "${DISABLE_AUTO_UPDATE}" ]; then

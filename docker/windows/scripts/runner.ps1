@@ -135,6 +135,11 @@ function Start-GitHubRunner {
     if ($env:EPHEMERAL) {
         Write-Log "Ephemeral option is enabled"
         $configArgs += "--ephemeral"
+        # Auto-disable updates for ephemeral runners unless explicitly overridden
+        if (-not $env:DISABLE_AUTO_UPDATE) {
+            Write-Log "Auto-disabling updates for ephemeral runner"
+            $env:DISABLE_AUTO_UPDATE = "true"
+        }
     }
 
     if ($env:DISABLE_AUTO_UPDATE) {
