@@ -181,5 +181,5 @@ RUN LATEST_VERSION=$(curl -fsSL https://gitea.com/api/v1/repos/gitea/act_runner/
 # Return to home directory
 WORKDIR /home/mauiusr
 
-# Default command - just keep the container running
-CMD ["tail", "-f", "/dev/null"]
+# Default command - run init script which will start runner if credentials provided
+CMD ["/usr/bin/bash", "/home/mauiusr/init.sh"]
