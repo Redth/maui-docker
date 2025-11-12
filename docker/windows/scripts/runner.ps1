@@ -48,7 +48,9 @@ if (-not $GITHUB_RUNNER_ENABLED -and -not $GITEA_RUNNER_ENABLED) {
     Write-Log "No runner credentials provided. Skipping runner configuration."
     Write-Log "To enable GitHub runner, set GITHUB_ORG and GITHUB_TOKEN"
     Write-Log "To enable Gitea runner, set GITEA_INSTANCE_URL and GITEA_RUNNER_TOKEN"
-    exit 0
+    Write-Log "Container will remain running for development use."
+    # Exit - the container stays alive via the CMD
+    return
 }
 
 # Function to configure and run GitHub Actions runner

@@ -91,6 +91,7 @@ RUN android sdk accept-licenses --force --home="$env:ANDROID_HOME"
 # Copy the init script and runner script
 COPY scripts/init.ps1 C:/init.ps1
 COPY scripts/runner.ps1 C:/runner.ps1
+COPY scripts/entrypoint.ps1 C:/entrypoint.ps1
 
 # Copy software manifest generation scripts
 COPY scripts/Generate-SoftwareManifest.ps1 C:/temp/Generate-SoftwareManifest.ps1
@@ -125,5 +126,6 @@ RUN $releases = Invoke-RestMethod -Uri 'https://gitea.com/api/v1/repos/gitea/act
 # Return to root
 WORKDIR C:/
 
-# Default command - just keep the container running
-CMD ["powershell", "while ($true) { Start-Sleep -Seconds 30 }"]
+# Use ENTRYPOINT to start runners in background, CMD is user-overridable
+ENTRYPOINT ["powershell.exe", "-File", "C:/entrypoint.ps1"]
+CMD ["powershell.exe", "-Command", "while ($true) { Start-Sleep -Seconds 30 }"]

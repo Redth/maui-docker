@@ -53,9 +53,8 @@ if [ "$GITHUB_RUNNER_ENABLED" = false ] && [ "$GITEA_RUNNER_ENABLED" = false ]; 
   log "To enable GitHub runner, set GITHUB_ORG and GITHUB_TOKEN"
   log "To enable Gitea runner, set GITEA_INSTANCE_URL and GITEA_RUNNER_TOKEN"
   log "Container will remain running for development use."
-  log "Press Ctrl+C to exit."
-  # Keep container alive for development use
-  exec tail -f /dev/null
+  # Exit - the container stays alive via the CMD
+  exit 0
 fi
 
 # Function to configure and run GitHub Actions runner

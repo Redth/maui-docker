@@ -125,9 +125,10 @@ ENV PATH="/home/mauiusr/.dotnet/tools:${PATH}"
 # Set working directory
 WORKDIR /home/mauiusr
 
-# Copy the init script and runner script
-COPY scripts/init.sh /home/mauiusr/init.sh
-COPY scripts/runner.sh /home/mauiusr/runner.sh
+# Copy the init script and runner script with correct ownership and permissions
+COPY --chown=1400:1401 --chmod=755 scripts/init.sh /home/mauiusr/init.sh
+COPY --chown=1400:1401 --chmod=755 scripts/runner.sh /home/mauiusr/runner.sh
+COPY --chown=1400:1401 --chmod=755 scripts/entrypoint.sh /home/mauiusr/entrypoint.sh
 
 # Install and configure Android SDK
 RUN android sdk download --home="${ANDROID_HOME}"
@@ -181,5 +182,6 @@ RUN LATEST_VERSION=$(curl -fsSL https://gitea.com/api/v1/repos/gitea/act_runner/
 # Return to home directory
 WORKDIR /home/mauiusr
 
-# Default command - run init script which will start runner if credentials provided
-CMD ["/usr/bin/bash", "/home/mauiusr/init.sh"]
+# Use ENTRYPOINT to start runners in background, CMD is user-overridable
+ENTRYPOINT ["/home/mauiusr/entrypoint.sh"]
+CMD ["tail", "-f", "/dev/null"]
