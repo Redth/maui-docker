@@ -933,13 +933,36 @@ function Get-LatestNpmPackageVersion {
 # Function to get latest Appium-related package versions
 function Get-LatestAppiumVersions {
     Write-Host "Getting latest Appium package versions from npm..."
-    
+
     $appiumVersion = Get-LatestNpmPackageVersion -PackageName "appium"
     $uiAutomator2Version = Get-LatestNpmPackageVersion -PackageName "appium-uiautomator2-driver"
-    
+
     return @{
         AppiumVersion = $appiumVersion
         UIAutomator2DriverVersion = $uiAutomator2Version
+    }
+}
+
+function Get-LatestGitHubActionsRunnerVersion {
+    Write-Host "Getting latest GitHub Actions runner version..."
+
+    try {
+        $apiUrl = "https://api.github.com/repos/actions/runner/releases/latest"
+        $response = Invoke-RestMethod -Uri $apiUrl -Method Get -Headers @{
+            "Accept" = "application/vnd.github+json"
+            "User-Agent" = "maui-containers-build-script"
+        }
+
+        # Extract version number (remove 'v' prefix if present)
+        $version = $response.tag_name -replace '^v', ''
+        Write-Host "Found latest GitHub Actions runner version: $version"
+
+        return $version
+    }
+    catch {
+        Write-Warning "Failed to get latest GitHub Actions runner version: $_"
+        Write-Warning "Falling back to default version: 2.323.0"
+        return "2.323.0"
     }
 }
 
