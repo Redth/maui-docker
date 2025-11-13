@@ -98,9 +98,16 @@ fi
 
 RUNNER_LABELS=${GITEA_RUNNER_LABELS:-"macos,maui,arm64"}
 
-# Register the runner if not already configured
-if [[ ! -f "${CONFIG_FILE}" ]]; then
-  log "Registering runner '${RUNNER_NAME_VALUE}' with Gitea instance at '${GITEA_INSTANCE_URL}'"
+# Clean up any pre-existing runner configuration to prevent stale token errors
+# This allows the runner to work correctly across VM restarts
+if [[ -f "${CONFIG_FILE}" ]]; then
+  log "Cleaning up pre-existing runner configuration"
+  rm -f "${CONFIG_FILE}"
+  log "Old configuration removed"
+fi
+
+# Register the runner (always, since we clean up above)
+log "Registering runner '${RUNNER_NAME_VALUE}' with Gitea instance at '${GITEA_INSTANCE_URL}'"
 
   REGISTER_ARGS=(
     "--instance" "${GITEA_INSTANCE_URL}"
@@ -114,9 +121,6 @@ if [[ ! -f "${CONFIG_FILE}" ]]; then
   fi
 
   "${ACT_RUNNER_BIN}" register "${REGISTER_ARGS[@]}"
-else
-  log "Runner already configured (${CONFIG_FILE} exists)"
-fi
 
 cleanup() {
   log "Shutting down runner"

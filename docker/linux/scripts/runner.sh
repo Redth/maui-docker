@@ -80,6 +80,14 @@ start_github_runner() {
 
   cd /home/mauiusr/actions-runner
 
+  # Clean up any pre-existing runner configuration to prevent stale token errors
+  # This allows the runner to work correctly across container restarts
+  if [ -f ".runner" ] || [ -f ".credentials" ] || [ -f ".credentials_rsaparams" ]; then
+    log "Cleaning up pre-existing GitHub runner configuration"
+    rm -f .runner .credentials .credentials_rsaparams
+    log "Old GitHub configuration removed"
+  fi
+
   _RANDOM_RUNNER_SUFFIX=${RANDOM_RUNNER_SUFFIX:="true"}
   _RUNNER_NAME=${RUNNER_NAME:-${RUNNER_NAME_PREFIX:-github-runner}-$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13 ; echo '')}
   if [[ ${RANDOM_RUNNER_SUFFIX} != "true" ]]; then
@@ -186,28 +194,32 @@ start_gitea_runner() {
 
   _LABELS=${GITEA_RUNNER_LABELS:-maui,linux,amd64}
 
+  # Clean up any pre-existing runner configuration to prevent stale token errors
+  # This allows the runner to work correctly across container restarts
+  if [ -f ".runner" ]; then
+    log "Cleaning up pre-existing Gitea runner configuration"
+    rm -f .runner
+    log "Old Gitea configuration removed"
+  fi
+
   log "Registering Gitea runner: ${_RUNNER_NAME}"
   log "Labels: ${_LABELS}"
 
-  # Register the runner if not already registered
-  if [ ! -f ".runner" ]; then
-    log "Registering runner with Gitea..."
-    ./act_runner register \
-      --instance "${GITEA_INSTANCE_URL}" \
-      --token "${GITEA_RUNNER_TOKEN}" \
-      --name "${_RUNNER_NAME}" \
-      --labels "${_LABELS}" \
-      --no-interactive
+  # Register the runner (always, since we clean up above)
+  log "Registering runner with Gitea..."
+  ./act_runner register \
+    --instance "${GITEA_INSTANCE_URL}" \
+    --token "${GITEA_RUNNER_TOKEN}" \
+    --name "${_RUNNER_NAME}" \
+    --labels "${_LABELS}" \
+    --no-interactive
 
-    if [ $? -ne 0 ]; then
-      log "ERROR: Failed to register runner with Gitea. Skipping Gitea runner."
-      return 1
-    fi
-
-    log "Runner registered successfully"
-  else
-    log "Runner already registered (found .runner file)"
+  if [ $? -ne 0 ]; then
+    log "ERROR: Failed to register runner with Gitea. Skipping Gitea runner."
+    return 1
   fi
+
+  log "Runner registered successfully"
 
   cleanup_gitea() {
     log "Shutting down Gitea runner..."

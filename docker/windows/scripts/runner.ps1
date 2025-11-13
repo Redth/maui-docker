@@ -97,6 +97,14 @@ function Start-GitHubRunner {
 
     Set-Location -Path "C:\actions-runner"
 
+    # Clean up any pre-existing runner configuration to prevent stale token errors
+    # This allows the runner to work correctly across container restarts
+    if ((Test-Path ".runner") -or (Test-Path ".credentials") -or (Test-Path ".credentials_rsaparams")) {
+        Write-Log "Cleaning up pre-existing GitHub runner configuration"
+        Remove-Item -Path ".runner", ".credentials", ".credentials_rsaparams" -ErrorAction SilentlyContinue -Force
+        Write-Log "Old GitHub configuration removed"
+    }
+
     # Set runner name with appropriate suffix
     $RANDOM_RUNNER_SUFFIX = if ($env:RANDOM_RUNNER_SUFFIX) { $env:RANDOM_RUNNER_SUFFIX } else { "true" }
     $RUNNER_NAME_PREFIX = if ($env:RUNNER_NAME_PREFIX) { $env:RUNNER_NAME_PREFIX } else { "github-runner" }
@@ -193,32 +201,37 @@ function Start-GiteaRunner {
 
     $_LABELS = if ($env:GITEA_RUNNER_LABELS) { $env:GITEA_RUNNER_LABELS } else { "maui,windows,amd64" }
 
+    # Clean up any pre-existing runner configuration to prevent stale token errors
+    # This allows the runner to work correctly across container restarts
+    if (Test-Path -Path ".runner") {
+        Write-Log "Cleaning up pre-existing Gitea runner configuration"
+        Remove-Item -Path ".runner" -ErrorAction SilentlyContinue -Force
+        Write-Log "Old Gitea configuration removed"
+    }
+
     Write-Log "Registering Gitea runner: $_RUNNER_NAME"
     Write-Log "Labels: $_LABELS"
 
-    if (-not (Test-Path -Path ".runner")) {
-        Write-Log "Registering runner with Gitea..."
+    # Register the runner (always, since we clean up above)
+    Write-Log "Registering runner with Gitea..."
 
-        $registerArgs = @(
-            "register",
-            "--instance", $GITEA_INSTANCE_URL,
-            "--token", $GITEA_RUNNER_TOKEN,
-            "--name", $_RUNNER_NAME,
-            "--labels", $_LABELS,
-            "--no-interactive"
-        )
+    $registerArgs = @(
+        "register",
+        "--instance", $GITEA_INSTANCE_URL,
+        "--token", $GITEA_RUNNER_TOKEN,
+        "--name", $_RUNNER_NAME,
+        "--labels", $_LABELS,
+        "--no-interactive"
+    )
 
-        & .\act_runner.exe @registerArgs
+    & .\act_runner.exe @registerArgs
 
-        if ($LASTEXITCODE -ne 0) {
-            Write-Log "ERROR: Failed to register runner with Gitea. Skipping Gitea runner."
-            return $false
-        }
-
-        Write-Log "Runner registered successfully"
-    } else {
-        Write-Log "Runner already registered (found .runner file)"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Log "ERROR: Failed to register runner with Gitea. Skipping Gitea runner."
+        return $false
     }
+
+    Write-Log "Runner registered successfully"
 
     Write-Log "Starting Gitea runner daemon..."
     & .\act_runner.exe daemon

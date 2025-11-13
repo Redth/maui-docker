@@ -105,6 +105,14 @@ fi
 
 cd "${RUNNER_ROOT}"
 
+# Clean up any pre-existing runner configuration to prevent stale token errors
+# This allows the runner to work correctly across VM restarts
+if [[ -f ".runner" ]] || [[ -f ".credentials" ]] || [[ -f ".credentials_rsaparams" ]]; then
+  log "Cleaning up pre-existing runner configuration"
+  rm -f .runner .credentials .credentials_rsaparams
+  log "Old configuration removed"
+fi
+
 RANDOM_RUNNER_SUFFIX=${RANDOM_RUNNER_SUFFIX:-"true"}
 
 if [[ -n "${RUNNER_NAME:-}" ]]; then
